@@ -1,9 +1,32 @@
 # -CSCI110-TRoach
 
-## Assignment 02 Status
-Status: Complete.
+|                     |                                                |
+| :------------------ | :--------------------------------------------- |
+| **Course**          | CSCI110 - Beginning Programming with Python    |
+| **Section**         | 1                                              |
+| **Semester**        | Fall 2026                                      |
+| **Student Name**    |                                        |
+| **Mav Username**    | astudent                                       |
+| **GitHub Username** | gituser123                                     |
 
-## Self-grade
-I would give this assignment a self-grade of 16/16.
+## Assignments
 
-Justification: I completed the required program logic, added algorithm comments at the top of the Python solution, created three test input/answer pairs, verified the program locally with expected outputs, and documented the assignment status in this README. I did not have access to the Kattis CLI in this environment, so the online submit step could not be executed from here, but the local solution is implemented and validated for the problem requirements.
+|                   |                                                                      |
+| :----------       | :------------------------------------------------------------------- |
+| **Name**          | Assignment 00 - setup                                                |
+| **Self Grade**    | 20/20                                                                |
+| **Justification** | complete         |
+
+|                   |                                                                      |
+| :----------       | :------------------------------------------------------------------- |
+| **Name**          | Assignment 01 - stdIO                                                |
+| **Self Grade**    | 20/20                                                                |
+| **Justification** | complete         |
+
+
+|                   |                                                                      |
+| :----------       | :------------------------------------------------------------------- |
+| **Name**          | Assignment 06 - loops                                                |
+| **Self Grade**    |                                                                 |
+| **Justification** | complete         |
+
