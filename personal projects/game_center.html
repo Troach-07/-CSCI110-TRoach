@@ -12,7 +12,10 @@
     .brand { display: flex; align-items: baseline; gap: 12px; }
     .brand strong { color: var(--gold); font-size: 25px; font-weight: 500; }
     .brand span, .wallet label { color: var(--muted); font: 11px system-ui, sans-serif; letter-spacing: 1.4px; text-transform: uppercase; }
-    .wallet { display: grid; gap: 3px; text-align: right; font: 14px system-ui, sans-serif; }
+    .wallet { display: grid; grid-template-columns: auto auto; align-items: center; gap: 3px 10px; text-align: right; font: 14px system-ui, sans-serif; }
+    .wallet label, .wallet strong { grid-column: 1; }
+    #save-terminal { grid-column: 2; grid-row: 1 / 3; min-height: 38px; padding: 6px 10px; border: 1px solid var(--gold); border-radius: 4px; background: #183b2f; color: var(--gold); font: 12px system-ui, sans-serif; }
+    #save-status { grid-column: 1 / -1; min-height: 16px; color: var(--muted); font: 11px system-ui, sans-serif; }
     .wallet strong { color: white; font-size: 20px; }
     .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 25px; max-width: 1440px; margin: auto; padding: 24px 28px 40px; }
     aside { align-self: start; display: grid; gap: 5px; position: sticky; top: 16px; }
@@ -41,6 +44,11 @@
     .form-row { display: flex; align-items: end; gap: 9px; flex-wrap: wrap; }
     .form-row label { min-width: 150px; flex: 1; }
     .result { min-height: 25px; margin: 12px 0 0; color: #f1dfa9; font: 14px/1.5 system-ui, sans-serif; }
+    .guess-bank { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .guess-bank table { width: 100%; border-collapse: collapse; font: 13px system-ui, sans-serif; }
+    .guess-bank th, .guess-bank td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+    .guess-bank th { color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; }
+    .guess-bank tr.latest { background: #dfc27718; color: #f5df9e; }
     .game-controls { max-width: 820px; }
     .option-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0; }
     .choice { min-height: 38px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 4px; background: #142c24; }
@@ -57,6 +65,7 @@
     .roulette-layout { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(350px, .95fr); gap: 24px; align-items: start; }
     .roulette-wheel { width: min(100%, 520px); height: auto; filter: drop-shadow(0 14px 20px #07171099); }
     .roulette-wheel #wheel-spin, .roulette-wheel #ball-spin { transform-box: view-box; transform-origin: 250px 250px; }
+    .roulette-wheel .ball { fill: #04610a; stroke: #6b5b3d; stroke-width: 1; filter: drop-shadow(0 1px 3px #000); }
     .roulette-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 12px 0; }
     .roulette-options .choice { text-align: left; font: 13px system-ui, sans-serif; }
     .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 9px; }
@@ -64,6 +73,8 @@
     .field-card img { display: block; width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: 2px; }
     .field-card span { display: block; padding: 6px 2px 2px; color: var(--muted); font: 12px system-ui, sans-serif; }
     .field-card:hover, .field-card.selected { border-color: var(--gold); }
+    @keyframes field-shuffle-in { from { opacity: .25; transform: translateY(7px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .field-card.shuffle-in { animation: field-shuffle-in 360ms ease-out both; animation-delay: calc(var(--shuffle-index) * 12ms); }
     .letter-grid { display: grid; grid-template-columns: repeat(9, minmax(30px, 1fr)); gap: 5px; max-width: 540px; }
     .letter-grid button { min-height: 35px; border: 1px solid var(--line); border-radius: 3px; background: #183b2f; }
     .letter-grid button:disabled { opacity: .45; }
@@ -96,7 +107,7 @@
 <body>
   <header>
     <div class="brand"><strong>Game Center</strong><span>Table games & field finder</span></div>
-    <div class="wallet"><label>Gambling balance</label><strong id="wallet">$50</strong></div>
+    <div class="wallet"><label>Gambling balance</label><strong id="wallet">$50</strong><button id="save-terminal" type="button">Save</button><span id="save-status" role="status"></span></div>
   </header>
   <div class="layout">
     <aside aria-label="Game navigation">
@@ -138,6 +149,25 @@ function saveBalance() {
   try { localStorage.setItem('hellBalance', String(balance)); } catch {}
   document.getElementById('wallet').textContent = '$' + balance.toLocaleString();
 }
+async function saveBalanceToTerminal() {
+  saveBalance();
+  const status = document.getElementById('save-status');
+  const button = document.getElementById('save-terminal');
+  button.disabled = true;
+  try {
+    const response = await fetch('/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({balance}),
+    });
+    if (!response.ok) throw new Error('Terminal save is unavailable.');
+    status.textContent = `Saved $${balance.toLocaleString()} to the terminal.`;
+  } catch {
+    status.textContent = `Saved $${balance.toLocaleString()} on this device.`;
+  } finally {
+    button.disabled = false;
+  }
+}
 function randomInt(max) { return Math.floor(Math.random() * max); }
 function setStage(title, content) {
   activeView = title;
@@ -151,6 +181,7 @@ function home() {
     <button class="game-card" data-open="hangman"><strong>Hangman</strong><span>Reveal the word one letter at a time.</span></button>
     <button class="game-card" data-open="rps"><strong>Rock Paper Scissors</strong><span>Play a quick round against the house.</span></button>
     <button class="game-card" data-open="dice"><strong>Dice Guessing</strong><span>Call the next roll from one to six.</span></button>
+    <button class="game-card" data-open="math"><strong>Math Game</strong><span>Guess the missing number in an equation.</span></button>
     <button class="game-card" data-open="gambling"><strong>Gambling</strong><span>Play card, dice, and roulette tables.</span></button>
     <button class="game-card" data-open="finder"><strong>Field Finder</strong><span>Search 21 field scenes for the hidden person.</span></button>
     <button class="game-card" data-open="add-money"><strong>Add money</strong><span>Update your gambling balance.</span></button>
@@ -166,20 +197,87 @@ function readWager() {
 }
 function settle(net) { balance += net; saveBalance(); }
 function startGuess(gambling = false) {
-  session = {target: randomInt(100) + 1, attempts: 0, gambling, wager: null, done: false};
+  session = {target: randomInt(100) + 1, attempts: 0, guesses: [], gambling, wager: null, done: false};
   drawGuess();
+}
+function makeMathQuestion() {
+  const symbol = ['+', '-', '*', '/'][randomInt(4)];
+  let number1, number2, answer;
+  if (symbol === '/') {
+    number2 = randomInt(12) + 1;
+    answer = randomInt(12) + 1;
+    number1 = number2 * answer;
+  } else {
+    number1 = randomInt(12) + 1;
+    number2 = randomInt(12) + 1;
+    if (symbol === '+') answer = number1 + number2;
+    else if (symbol === '-') {
+      if (number1 < number2) [number1, number2] = [number2, number1];
+      answer = number1 - number2;
+    } else answer = number1 * number2;
+  }
+  const hideFirst = randomInt(2) === 0;
+  return {
+    prompt: `${hideFirst ? '?' : number1} ${symbol} ${hideFirst ? number2 : '?'} = ${answer}`,
+    correct: hideFirst ? number1 : number2,
+  };
+}
+function startMathGame(score = 0, message = 'Guess the missing number.') {
+  const question = makeMathQuestion();
+  session = {...question, score, done: false};
+  drawMathGame(message);
+}
+function drawMathGame(message) {
+  const s = session;
+  setStage('Math Game', `<div class="game-controls">
+    <p class="muted">Correct answers: ${s.score}</p>
+    <h2>${s.prompt}</h2>
+    <div class="form-row"><label>Your answer<input id="math-guess" type="number" step="1" ${s.done ? 'disabled' : ''}></label><button class="action" id="math-submit" ${s.done ? 'disabled' : ''}>Check</button></div>
+    <p class="result" id="result">${message}</p>
+    ${s.done ? '<button class="action secondary" id="math-next">New question</button>' : ''}
+  </div>`);
+  const input = document.getElementById('math-guess');
+  const submit = () => {
+    const value = input.value.trim();
+    if (value === '' || !Number.isInteger(Number(value))) {
+      errorText('result', 'Enter a whole number.');
+      return;
+    }
+    const guess = Number(value);
+    if (guess === s.correct) {
+      s.score++;
+      s.done = true;
+      settle(50);
+      drawMathGame('Correct! You found the missing number and earned $50.');
+    } else {
+      errorText('result', 'Not quite. Try another number.');
+      input.select();
+    }
+  };
+  document.getElementById('math-submit')?.addEventListener('click', submit);
+  input?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') submit();
+  });
+  document.getElementById('math-next')?.addEventListener('click', () => startMathGame(s.score));
+}
+function guessHistoryMarkup(guesses) {
+  if (guesses.length === 0) return '<tr><td colspan="3" class="muted">No guesses yet.</td></tr>';
+  return guesses.map((guess, index) => `<tr class="${index === guesses.length - 1 ? 'latest' : ''}"><td>${index + 1}</td><td>${guess.value}</td><td>${guess.result}</td></tr>`).join('');
 }
 function drawGuess(message = 'Enter a number from 1 to 100.') {
   const s = session;
   setStage(s.gambling ? 'Gambling · Number Guessing' : 'Number Guessing', `<div class="game-controls">
     <p class="muted">${s.attempts} of 10 guesses used.</p>
     <div class="form-row">${s.gambling && s.wager === null ? wagerPanel() : ''}<label>Your guess<input id="guess-value" type="number" min="1" max="100" ${s.done ? 'disabled' : ''}></label><button class="action" id="guess-submit" ${s.done ? 'disabled' : ''}>Guess</button></div>
-    <p class="result" id="result">${message}</p>${s.done ? '<button class="action secondary" data-restart="guess">Play again</button>' : ''}</div>`);
+    <p class="result" id="result">${message}</p>${s.done ? '<button class="action secondary" data-restart="guess">Play again</button>' : ''}
+    <section class="guess-bank" aria-label="Guess history"><h2>Guess history</h2><table><thead><tr><th>Try</th><th>Guess</th><th>Relation</th></tr></thead><tbody>${guessHistoryMarkup(s.guesses)}</tbody></table></section></div>`);
   document.getElementById('guess-submit')?.addEventListener('click', () => {
     const input = document.getElementById('guess-value'); const value = Number(input.value);
     if (!Number.isInteger(value) || value < 1 || value > 100) { errorText('result', 'Choose a whole number from 1 to 100.'); return; }
     if (s.gambling && s.wager === null) { s.wager = readWager(); if (s.wager === null) return; }
     s.attempts++;
+    const relation = value === s.target ? 'Correct' : value < s.target ? 'Too low' : 'Too high';
+    s.guesses.push({value, result: relation});
     if (value === s.target) { if (s.gambling) settle(s.wager); s.done = true; drawGuess(`Correct. The number was ${s.target}.${s.gambling ? ` You won $${s.wager}.` : ''}`); }
     else if (s.attempts >= 10) { if (s.gambling) settle(-s.wager); s.done = true; drawGuess(`Out of guesses. The number was ${s.target}.${s.gambling ? ` You lost $${s.wager}.` : ''}`); }
     else drawGuess(`${value < s.target ? 'Too low' : 'Too high'}. ${10 - s.attempts} guesses left.`);
@@ -273,37 +371,55 @@ function launchCasino(game) {
   else if (game === 'poker') pokerPage();
   else if (game === 'blackjack') blackjackPage();
 }
-function finderPage() {
-  const target = Number.isInteger(fieldIndex) && fieldIndex >= 0 && fieldIndex < fieldCount ? fieldIndex : randomInt(fieldCount);
-  session = {target, attempts:0, done:false};
+function shuffleFieldOrder(previousOrder, hiddenSource) {
+  const order = Array.from({length:fieldCount}, (_, index) => index);
+  for (let index = order.length - 1; index > 0; index--) {
+    const swapIndex = randomInt(index + 1);
+    [order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+  }
+  if (order.indexOf(hiddenSource) === previousOrder.indexOf(hiddenSource)) {
+    const targetPosition = order.indexOf(hiddenSource);
+    const otherPosition = (targetPosition + 1) % order.length;
+    [order[targetPosition], order[otherPosition]] = [order[otherPosition], order[targetPosition]];
+  }
+  return order;
+}
+function finderPage(fieldOrder = Array.from({length:fieldCount}, (_, index) => index), hiddenSource = fieldIndex >= 0 && fieldIndex < fieldCount ? fieldIndex : randomInt(fieldCount), shuffled = false) {
+  session = {target:fieldOrder.indexOf(hiddenSource), hiddenSource, fieldOrder, attempts:0, done:false};
   const cards = Array.from({length:fieldCount}, (_,index) => {
-    const position = (index / 2).toFixed(1).replace('.','_');
-    return `<button class="field-card" data-field="${index}"><img src="../fields/field_${position}.svg" alt="Field ${index/2} scene"><span>Field ${(index/2).toFixed(1)}</span></button>`;
+    const sourcePosition = (fieldOrder[index] / 2).toFixed(1).replace('.','_');
+    const fieldPosition = (index / 2).toFixed(1);
+    return `<button class="field-card ${shuffled ? 'shuffle-in' : ''}" style="--shuffle-index:${index}" data-field="${index}"><img src="../fields/field_${sourcePosition}.svg" alt="Field ${fieldPosition} scene"><span>Field ${fieldPosition}</span></button>`;
   }).join('');
   setStage('Field Finder', `<p class="muted">Find the hidden person among 21 fields.</p><div class="field-grid">${cards}</div><p class="result" id="result">Choose a field.</p>`);
   stage.querySelectorAll('[data-field]').forEach(button => button.addEventListener('click', () => {
     if (session.done) return;
     session.attempts++;
-    if (Number(button.dataset.field) === session.target) { session.done = true; errorText('result', `Found in field ${(session.target/2).toFixed(1)} after ${session.attempts} guesses.`); }
+    if (Number(button.dataset.field) === session.target) {
+      session.done = true;
+      const completedRound = session;
+      errorText('result', `Found in field ${(session.target/2).toFixed(1)} after ${session.attempts} guesses. Shuffling fields...`);
+      setTimeout(() => finderPage(shuffleFieldOrder(completedRound.fieldOrder, completedRound.hiddenSource), completedRound.hiddenSource, true), 1000);
+    }
     else { button.disabled = true; button.classList.add('selected'); errorText('result', `Not there. ${fieldCount - session.attempts} fields remain.`); }
   }));
 }
 function roulettePage() {
   rouletteBet = 'red'; rouletteNumber = null; rouletteBusy = false;
   const cells = `<button class="number-cell green" data-number="0">0</button>` + Array.from({length:36},(_,i) => { const n=i+1; return `<button class="number-cell ${redNumbers.has(n)?'red':''}" data-number="${n}">${n}</button>`; }).join('');
-  setStage('Gambling · Roulette', `<div class="roulette-layout"><section><svg class="roulette-wheel" viewBox="0 0 500 500" aria-label="Roulette wheel"><circle cx="250" cy="250" r="235" fill="#171817" stroke="#b08a4c" stroke-width="10"/><g id="wheel-spin"><circle cx="250" cy="250" r="220" fill="#302619" stroke="#e1c477" stroke-width="4"/><g id="pockets"></g><circle cx="250" cy="250" r="182" fill="none" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="112" fill="#bd9852" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="75" fill="#17241e" stroke="#e0c276" stroke-width="3"/><text x="250" y="246" class="wheel-title">EUROPEAN</text><text x="250" y="270" class="wheel-subtitle">SINGLE ZERO</text></g><g id="ball-spin"><circle class="ball" cx="250" cy="78" r="9"/></g><path class="pointer" d="M250 12 L239 38 L261 38 Z"/></svg><p class="result" id="roulette-result">Choose a bet and spin.</p></section><section><h2>Betting table</h2><p class="muted">Select a number or outside bet.</p><div class="number-grid" id="roulette-numbers">${cells}</div><div class="roulette-options">${[['red','Red'],['black','Black'],['even','Even'],['odd','Odd'],['low','Low · 1–18'],['high','High · 19–36']].map(([key,label])=>`<button class="choice" data-roulette-bet="${key}">${label}</button>`).join('')}</div><div class="form-row"><label>Wager amount<input id="roulette-wager" type="number" min="1" max="${balance}" value="${Math.min(10,balance)}"></label><button id="roulette-spin" class="action">Spin</button></div></section></div>`);
+  setStage('Gambling · Roulette', `<div class="roulette-layout"><section><svg class="roulette-wheel" viewBox="0 0 500 500" aria-label="Roulette wheel"><circle cx="250" cy="250" r="235" fill="#171817" stroke="#b08a4c" stroke-width="10"/><g id="wheel-spin"><circle cx="250" cy="250" r="220" fill="#302619" stroke="#e1c477" stroke-width="4"/><g id="pockets"></g><circle cx="250" cy="250" r="188" fill="none" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="145" fill="#bd9852" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="75" fill="#17241e" stroke="#e0c276" stroke-width="3"/><text x="250" y="246" class="wheel-title">EUROPEAN</text><text x="250" y="270" class="wheel-subtitle">SINGLE ZERO</text></g><g id="ball-spin"><circle class="ball" cx="250" cy="73" r="6"/></g><path class="pointer" d="M250 12 L239 38 L261 38 Z"/></svg><p class="result" id="roulette-result">Choose a bet and spin.</p></section><section><h2>Betting table</h2><p class="muted">Select a number or outside bet.</p><div class="number-grid" id="roulette-numbers">${cells}</div><div class="roulette-options">${[['red','Red'],['black','Black'],['even','Even'],['odd','Odd'],['low','Low · 1–18'],['high','High · 19–36']].map(([key,label])=>`<button class="choice" data-roulette-bet="${key}">${label}</button>`).join('')}</div><div class="form-row"><label>Wager amount<input id="roulette-wager" type="number" min="1" max="${balance}" value="${Math.min(10,balance)}"></label><button id="roulette-spin" class="action">Spin</button></div></section></div>`);
   const svgNS = 'http://www.w3.org/2000/svg';
   const pockets = document.getElementById('pockets');
   wheelOrder.forEach((number, index) => {
     const start = -Math.PI / 2 + index * Math.PI * 2 / 37 + .004;
     const end = -Math.PI / 2 + (index + 1) * Math.PI * 2 / 37 - .004;
     const point = (radius, angle) => [250 + radius * Math.cos(angle), 250 + radius * Math.sin(angle)];
-    const outerStart = point(169, start), outerEnd = point(169, end);
-    const innerEnd = point(112, end), innerStart = point(112, start);
-    const middle = (start + end) / 2, labelPoint = point(140, middle);
+    const outerStart = point(184, start), outerEnd = point(184, end);
+    const innerEnd = point(145, end), innerStart = point(145, start);
+    const middle = (start + end) / 2, labelPoint = point(164, middle);
     const path = document.createElementNS(svgNS, 'path');
-    path.setAttribute('d', `M${outerStart[0]} ${outerStart[1]} A169 169 0 0 1 ${outerEnd[0]} ${outerEnd[1]} L${innerEnd[0]} ${innerEnd[1]} A112 112 0 0 0 ${innerStart[0]} ${innerStart[1]} Z`);
-    path.setAttribute('fill', number === 0 ? '#167447' : redNumbers.has(number) ? '#bd2637' : '#17191a');
+    path.setAttribute('d', `M${outerStart[0]} ${outerStart[1]} A184 184 0 0 1 ${outerEnd[0]} ${outerEnd[1]} L${innerEnd[0]} ${innerEnd[1]} A145 145 0 0 0 ${innerStart[0]} ${innerStart[1]} Z`);
+    path.setAttribute('fill', number === 0 ? '#167447' : redNumbers.has(number) ? '#e32232' : '#111213');
     path.setAttribute('stroke', '#dfc277');
     path.setAttribute('stroke-width', '1');
     pockets.append(path);
@@ -312,7 +428,7 @@ function roulettePage() {
     label.setAttribute('x', labelPoint[0]);
     label.setAttribute('y', labelPoint[1]);
     label.setAttribute('fill', '#fff8e8');
-    label.setAttribute('font-size', '10');
+    label.setAttribute('font-size', '14');
     label.setAttribute('font-family', 'Georgia,serif');
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('dominant-baseline', 'middle');
@@ -345,7 +461,7 @@ async function spinRoulette() {
   updateRouletteSelection();
   const number = randomInt(37);
   const index = wheelOrder.indexOf(number);
-  const wheelDegrees = 360 * 8 - index * 360 / 37;
+  const wheelDegrees = 360 * 8 - (index + 0.5) * 360 / 37;
   const wheel = document.getElementById('wheel-spin'), ball = document.getElementById('ball-spin');
   const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 6000;
   const animationOptions = {duration, easing: 'cubic-bezier(.12,.78,.18,1)', fill: 'forwards'};
@@ -467,19 +583,26 @@ function finderPage() {
     else { button.disabled = true; button.classList.add('selected'); errorText('result', `Not there. ${fieldCount - session.attempts} fields remain.`); }
   }));
 }
-function exitPage() { setStage('Exit', '<p class="muted">Your session is complete. You can close this tab.</p>'); }
+function exitPage() {
+  balance = 50;
+  saveBalance();
+  fetch('/finish', {method: 'POST'}).catch(() => {});
+  setStage('Exit', '<p class="muted">Your session is complete. Your balance has reset to $50.</p>');
+}
 function openView(view) {
   if (view === 'home') home();
   else if (view === 'guess') startGuess();
   else if (view === 'hangman') startHangman();
   else if (view === 'rps') startRps();
   else if (view === 'dice') startDice();
+  else if (view === 'math') startMathGame();
   else if (view === 'gambling') gamblingMenu();
   else if (view === 'add-money') addMoneyPage();
   else if (view === 'finder') finderPage();
   else if (view === 'exit') exitPage();
 }
 document.querySelector('aside').addEventListener('click', event => { const button=event.target.closest('[data-view]');if(button)openView(button.dataset.view); });
+document.getElementById('save-terminal').addEventListener('click', saveBalanceToTerminal);
 stage.addEventListener('click', event => {
   const button = event.target.closest('[data-open]');
   if (button) openView(button.dataset.open);
@@ -489,6 +612,9 @@ stage.addEventListener('click', event => {
   else if (restart.dataset.restart === 'hangman') startHangman(session.gambling);
 });
 home();saveBalance();
+window.addEventListener('pagehide', () => {
+  if (location.hostname === '127.0.0.1') navigator.sendBeacon('/finish', new Blob([], {type: 'application/json'}));
+});
 </script>
 </body>
 </html>

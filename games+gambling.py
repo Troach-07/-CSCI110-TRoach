@@ -463,6 +463,12 @@ def poker_game():
     print("Tiebreak value:", tiebreak)
 
 
+def field_finder_game():
+    import test
+
+    test.game()
+
+
 def show_menu():
     print("\nWelcome to the Game Center!")
     print("1. Number Guessing")
@@ -472,12 +478,13 @@ def show_menu():
     print("5. Gambling")
     print("6. Blackjack")
     print("7. Poker")
-    print("8. Exit")
+    print("8. Field Finder")
+    print("9. Exit")
 
 
 while True:
     show_menu()
-    choice = input("Choose a game (1-8): ").strip()
+    choice = input("Choose a game (1-9): ").strip()
 
     if choice == "1":
         number_guessing_game()
@@ -494,7 +501,9 @@ while True:
     elif choice == "7":
         poker_game()
     elif choice == "8":
+        field_finder_game()
+    elif choice == "9":
         print("Goodbye!")
         break
     else:
-        print("Invalid choice. Please choose 1 through 8.")
+        print("Invalid choice. Please choose 1 through 9.")

@@ -1,4 +1,5 @@
-import time 
+import random
+import time
 
 current_epoch=time.time()
 print ("Current epoch time:", current_epoch)
@@ -27,16 +28,16 @@ def number_guessing_game():
         attempts += 1
 
         if guess < secret:
-            Print("checking if guess is equals than secret")
+            print("checking if guess is equal to the secret")
             time.sleep(0.5)
             print("Too low! Try again.")
         elif guess > secret:
-               Print("checking if guess is equals than secret")
-                       time.sleep(0.5)
+            print("checking if guess is equal to the secret")
+            time.sleep(0.5)
             print("Too high! Try again.")
         else:
-              Print("checking if guess is equals than secret")
-               time.sleep(0.5)
+            print("checking if guess is equal to the secret")
+            time.sleep(0.5)
             print(f"Correct! You guessed the number in {attempts} attempts.")
             return
 
@@ -44,3 +45,6 @@ def number_guessing_game():
             print(f"Attempts left: {max_attempts - attempts}")
 
     print(f"You ran out of guesses. The number was {secret}.")
+
+
+number_guessing_game()

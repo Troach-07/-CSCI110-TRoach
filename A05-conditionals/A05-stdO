@@ -1,0 +1,5 @@
+import sys
+
+a, b, c = map(int, sys.stdin.read().split())
+
+print("correct!" if a + b == c else "wrong!")
