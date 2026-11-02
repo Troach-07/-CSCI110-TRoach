@@ -62,7 +62,9 @@ def blackjack_game():
 
     print("\nWelcome to Blackjack!")
     print("Goal: get as close to 21 as possible without going over.")
-    print ("dealing cards") 
+    print ("Suffling Cards") 
+    time.sleep(1.5)
+    print ("Dealing Cards")
     time.sleep(1.5)
     while True:
         show_hand("Player", player_hand)
@@ -80,7 +82,9 @@ def blackjack_game():
 
         choice = input("Do you want to hit or stand? (h/s): ").strip().lower()
 
-        if choice == "h":
+        if choice == "h"
+            print ("Giving Card")
+            time.sleep(1.5)
             player_hand.append(deal_card(deck))
         elif choice == "s":
             break
@@ -97,7 +101,8 @@ def blackjack_game():
 
     player_total = hand_total(player_hand)
     dealer_total = hand_total(dealer_hand)
-
+    print("Checking Win Conditions")
+    time.sleep(1.5)
     print("\nFinal results:")
     show_hand("Player", player_hand)
     show_hand("Dealer", dealer_hand)
