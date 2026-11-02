@@ -47,8 +47,7 @@ def hand_total(hand):
 
 
 def deal_card(deck):
-    print ("dealing cards") 
-    time.sleep(1.5)
+
     return deck.pop()
 
 
@@ -66,7 +65,8 @@ def blackjack_game():
 
     print("\nWelcome to Blackjack!")
     print("Goal: get as close to 21 as possible without going over.")
-
+    print ("dealing cards") 
+    time.sleep(1.5)
     while True:
         show_hand("Player", player_hand)
         print("Dealer shows:", card_name(dealer_hand[0]))
