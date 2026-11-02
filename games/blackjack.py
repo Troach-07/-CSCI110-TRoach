@@ -1,9 +1,6 @@
 import random
 import time 
-current_epoch=time.time()
-print ("Current epoch time:", current_epoch)
-print ("waiting for 1.5 seconds...")
-time.sleep(1.5)
+
 SUITS = ["Hearts", "Diamonds", "Clubs", "Spades"]
 VALUES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 FACE_CARDS = {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
