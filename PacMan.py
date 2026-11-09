@@ -1,142 +1,317 @@
 
-import time
+import pygame
 import random
-import keyboard
+from collections import deque
+
+pygame.init()
 
 # Game settings
-map_width = 21
-map_height = 21
+TILE = 28
+FPS = 60
+PLAYER_DELAY = 110
+GHOST_DELAY = 230
 
-player_x = 1
-player_y = 1
-game_running = True
+LEVEL = [
+    "#####################",
+    "#.........#.........#",
+    "#.###.###.#.###.###.#",
+    "#o###.###.#.###.###o#",
+    "#...................#",
+    "#.###.#.#####.#.###.#",
+    "#.....#...#...#.....#",
+    "#####.###.#.###.#####",
+    "#...#.#.......#.#...#",
+    "#.#.#.#.##.##.#.#.#.#",
+    "#.#.....#...#.....#.#",
+    "#.#.#.#.#####.#.#.#.#",
+    "#...#.#.......#.#...#",
+    "#####.#.#####.#.#####",
+    "#.........#.........#",
+    "#.###.###.#.###.###.#",
+    "#o..#.....P.....#..o#",
+    "###.#.#.#####.#.#.###",
+    "#.....#...#...#.....#",
+    "#.#######.#.#######.#",
+    "#...................#",
+    "#####################"
+]
+
+WIDTH = len(LEVEL[0]) * TILE
+HEIGHT = len(LEVEL) * TILE + 50
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Python Pac-Man")
+
+clock = pygame.time.Clock()
+font = pygame.font.SysFont("Arial", 24, bold=True)
+
+BLACK = (0, 0, 0)
+BLUE = (30, 70, 255)
+YELLOW = (255, 230, 0)
+WHITE = (255, 255, 255)
+
+GHOST_COLORS = [
+    (255, 50, 50),
+    (255, 150, 200),
+    (0, 220, 255),
+    (255, 170, 30)
+]
+
+maze = [list(row) for row in LEVEL]
+
+player = [10, 16]
+start = player.copy()
+
+ghost_starts = [
+    [9, 10],
+    [10, 10],
+    [11, 10],
+    [10, 9]
+]
+
+ghosts = [pos.copy() for pos in ghost_starts]
+
+direction = (0, 0)
+next_direction = (0, 0)
+
 score = 0
+lives = 3
+power_until = 0
+last_player_move = 0
+last_ghost_move = 0
+game_over = False
+won = False
 
-# Generate a random maze
-def Generate_Maze():
-    maze = [["#" for x in range(map_width)]
-            for y in range(map_height)]
+# Remove player marker
+maze[player[1]][player[0]] = " "
 
-    def carve(x, y):
-        maze[y][x] = "."
+def can_move(x, y):
+    # Allow horizontal wraparound
+    x %= len(maze[0])
+    return (
+        0 <= y < len(maze)
+        and maze[y][x] != "#"
+    )
 
-        directions = [
-            (0, 2), (0, -2),
-            (2, 0), (-2, 0)
-        ]
+def move_character(pos, dx, dy):
+    nx = (pos[0] + dx) % len(maze[0])
+    ny = pos[1] + dy
+
+    if can_move(nx, ny):
+        pos[0] = nx
+        pos[1] = ny
+        return True
+
+    return False
+
+def reset_positions():
+    global direction, next_direction
+
+    player[:] = start
+    for ghost, original in zip(ghosts, ghost_starts):
+        ghost[:] = original
+
+    direction = (0, 0)
+    next_direction = (0, 0)
+
+def check_collision():
+    global lives, game_over, score
+
+    for ghost, original in zip(ghosts, ghost_starts):
+        if player == ghost:
+            if pygame.time.get_ticks() < power_until:
+                score += 200
+                ghost[:] = original.copy()
+            else:
+                lives -= 1
+                reset_positions()
+
+                if lives <= 0:
+                    game_over = True
+            return
+
+def ghost_move(ghost):
+    # Find shortest path toward player
+    queue = deque([(tuple(ghost), [])])
+    visited = {tuple(ghost)}
+
+    directions = [
+        (0, 1), (0, -1),
+        (1, 0), (-1, 0)
+    ]
+
+    while queue:
+        (x, y), path = queue.popleft()
+
+        if [x, y] == player:
+            if path:
+                dx, dy = path[0]
+                move_character(ghost, dx, dy)
+            return
+
         random.shuffle(directions)
 
         for dx, dy in directions:
-            nx = x + dx
+            nx = (x + dx) % len(maze[0])
             ny = y + dy
 
-            if (1 <= nx < map_width - 1 and
-                1 <= ny < map_height - 1 and
-                maze[ny][nx] == "#"):
+            if can_move(nx, ny) and (nx, ny) not in visited:
+                visited.add((nx, ny))
+                queue.append(((nx, ny), path + [(dx, dy)]))
 
-                maze[y + dy // 2][x + dx // 2] = "."
-                carve(nx, ny)
+def draw_game():
+    screen.fill(BLACK)
 
-    carve(1, 1)
+    # Draw maze
+    for y, row in enumerate(maze):
+        for x, cell in enumerate(row):
+            cx = x * TILE + TILE // 2
+            cy = y * TILE + TILE // 2
 
-    # Add extra paths for a Pac-Man-like maze
-    for y in range(1, map_height - 1):
-        for x in range(1, map_width - 1):
-            if maze[y][x] == "#" and random.random() < 0.12:
-                maze[y][x] = "."
+            if cell == "#":
+                pygame.draw.rect(
+                    screen, BLUE,
+                    (x*TILE+2, y*TILE+2, TILE-4, TILE-4),
+                    border_radius=7
+                )
 
-    # Place exit in bottom-right area
-    for y in range(map_height - 2, 0, -1):
-        for x in range(map_width - 2, 0, -1):
-            if maze[y][x] == ".":
-                maze[y][x] = "E"
-                return maze
+            elif cell == ".":
+                pygame.draw.circle(screen, WHITE, (cx, cy), 3)
 
-    return maze
+            elif cell == "o":
+                pygame.draw.circle(screen, WHITE, (cx, cy), 8)
 
+    # Draw Pac-Man
+    px = player[0]*TILE + TILE//2
+    py = player[1]*TILE + TILE//2
 
-maze = Generate_Maze()
+    pygame.draw.circle(screen, YELLOW, (px, py), TILE//2-2)
 
+    # Draw ghosts
+    for i, ghost in enumerate(ghosts):
+        gx = ghost[0]*TILE + TILE//2
+        gy = ghost[1]*TILE + TILE//2
 
-def Controls():
-    global player_x, player_y, game_running
+        color = GHOST_COLORS[i]
 
-    new_x = player_x
-    new_y = player_y
+        if pygame.time.get_ticks() < power_until:
+            color = BLUE
 
-    if keyboard.is_pressed("down"):
-        new_y = (player_y + 1) % map_height
+        pygame.draw.circle(screen, color, (gx, gy-3), 11)
+        pygame.draw.rect(screen, color, (gx-11, gy-3, 22, 13))
 
-    elif keyboard.is_pressed("up"):
-        new_y = (player_y - 1) % map_height
+        # Eyes
+        pygame.draw.circle(screen, WHITE, (gx-5, gy-4), 4)
+        pygame.draw.circle(screen, WHITE, (gx+5, gy-4), 4)
+        pygame.draw.circle(screen, BLACK, (gx-5, gy-4), 2)
+        pygame.draw.circle(screen, BLACK, (gx+5, gy-4), 2)
 
-    elif keyboard.is_pressed("left"):
-        new_x = (player_x - 1) % map_width
+    # Scoreboard
+    info = font.render(
+        f"Score: {score}    Lives: {lives}",
+        True, WHITE
+    )
+    screen.blit(info, (10, HEIGHT-40))
 
-    elif keyboard.is_pressed("right"):
-        new_x = (player_x + 1) % map_width
+    if game_over or won:
+        message = "YOU WIN!" if won else "GAME OVER"
+        text = font.render(message, True, YELLOW)
+        screen.blit(
+            text,
+            text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        )
 
-    elif keyboard.is_pressed("esc"):
-        game_running = False
-
-    if maze[new_y][new_x] != "#":
-        player_x = new_x
-        player_y = new_y
-
-
-def Map_Size_Elements():
-    for y in range(map_height):
-        for x in range(map_width):
-            if x == player_x and y == player_y:
-                print("P", end=" ")
-            else:
-                print(maze[y][x], end=" ")
-        print()
-
-
-def Player():
-    global score
-
-    if maze[player_y][player_x] == ".":
-        score += 10
-        maze[player_y][player_x] = " "
-
-    print(f"Score: {score}")
-    print(f"Position: ({player_x}, {player_y})")
-
-
-def Game_Menu():
-    print("=== RANDOM PAC-MAN MAZE ===")
-    print("P = Player")
-    print("# = Wall")
-    print(". = Dot (+10 points)")
-    print("E = Exit")
-    print("Arrow Keys = Move")
-    print("ESC = Quit")
-    print("===========================")
-
+    pygame.display.flip()
 
 def main():
-    global game_running
+    global direction, next_direction
+    global score, power_until
+    global last_player_move, last_ghost_move
+    global won
 
-    Game_Menu()
-    time.sleep(2)
+    running = True
 
-    while game_running:
-        Controls()
+    while running:
+        now = pygame.time.get_ticks()
 
-        print("\n" * 30)
-        Map_Size_Elements()
-        Player()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-        if maze[player_y][player_x] == "E":
-            print("YOU WIN!")
-            game_running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key == pygame.K_UP:
+                    next_direction = (0, -1)
+                elif event.key == pygame.K_DOWN:
+                    next_direction = (0, 1)
+                elif event.key == pygame.K_LEFT:
+                    next_direction = (-1, 0)
+                elif event.key == pygame.K_RIGHT:
+                    next_direction = (1, 0)
 
-        time.sleep(0.15)
+        if not game_over and not won:
 
-    print("Game Over!")
+            # Player movement
+            if now - last_player_move >= PLAYER_DELAY:
+                last_player_move = now
 
+                dx, dy = next_direction
+                nx = (player[0] + dx) % len(maze[0])
+                ny = player[1] + dy
+
+                if can_move(nx, ny):
+                    direction = next_direction
+
+                move_character(player, *direction)
+
+                cell = maze[player[1]][player[0]]
+
+                if cell == ".":
+                    score += 10
+                    maze[player[1]][player[0]] = " "
+
+                elif cell == "o":
+                    score += 50
+                    power_until = now + 6000
+                    maze[player[1]][player[0]] = " "
+
+                check_collision()
+
+            # Ghost movement
+            if now - last_ghost_move >= GHOST_DELAY:
+                last_ghost_move = now
+
+                for ghost in ghosts:
+                    if now < power_until:
+                        options = [
+                            (0, 1), (0, -1),
+                            (1, 0), (-1, 0)
+                        ]
+                        random.shuffle(options)
+
+                        for dx, dy in options:
+                            if move_character(ghost, dx, dy):
+                                break
+                    else:
+                        ghost_move(ghost)
+
+                    check_collision()
+
+            # Win when all dots are collected
+            if not any(
+                cell in (".", "o")
+                for row in maze
+                for cell in row
+            ):
+                won = True
+
+        draw_game()
+        clock.tick(FPS)
+
+    pygame.quit()
 
 if __name__ == "__main__":
     main()
+
+##remember to install pygame 
