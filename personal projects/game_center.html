@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Game Center</title>
   <style>
+    /* Shared colors and the basic page layout. */
     :root { color-scheme: dark; --felt: #12392e; --felt-light: #1b4c3c; --gold: #dfc277; --paper: #f5f0e4; --muted: #c7c1ae; --red: #bd2637; --black: #181a19; --line: #dfc27755; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; color: var(--paper); background: radial-gradient(ellipse at 24% 12%, #285947 0, var(--felt) 54%, #0c261f 100%); font-family: Georgia, 'Times New Roman', serif; }
@@ -12,6 +13,7 @@
     .brand { display: flex; align-items: baseline; gap: 12px; }
     .brand strong { color: var(--gold); font-size: 25px; font-weight: 500; }
     .brand span, .wallet label { color: var(--muted); font: 11px system-ui, sans-serif; letter-spacing: 1.4px; text-transform: uppercase; }
+    /* Balance header, sidebar navigation, and the area where game screens appear. */
     .wallet { display: grid; grid-template-columns: auto auto; align-items: center; gap: 3px 10px; text-align: right; font: 14px system-ui, sans-serif; }
     .wallet label, .wallet strong { grid-column: 1; }
     #save-terminal { grid-column: 2; grid-row: 1 / 3; min-height: 38px; padding: 6px 10px; border: 1px solid var(--gold); border-radius: 4px; background: #183b2f; color: var(--gold); font: 12px system-ui, sans-serif; }
@@ -29,6 +31,7 @@
     h2 { color: var(--gold); font-size: 18px; font-weight: 500; }
     h3 { margin-bottom: 8px; color: #f1dfa9; font-size: 15px; font-weight: 500; }
     .muted { color: var(--muted); font: 13px/1.5 system-ui, sans-serif; }
+    /* Reusable cards, buttons, form controls, and status messages. */
     .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
     .game-card { display: grid; gap: 7px; min-height: 100px; padding: 15px; border: 1px solid var(--line); border-radius: 5px; background: #102d24aa; color: var(--paper); text-align: left; cursor: pointer; }
     .game-card:hover { border-color: var(--gold); background: #1b4536; }
@@ -50,6 +53,7 @@
     .guess-bank th { color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; }
     .guess-bank tr.latest { background: #dfc27718; color: #f5df9e; }
     .game-controls { max-width: 820px; }
+    /* Components used by card, roulette, field-finding, and Hangman games. */
     .option-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0; }
     .choice { min-height: 38px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 4px; background: #142c24; }
     .choice:hover, .choice.selected { border-color: var(--gold); background: #244637; }
@@ -82,6 +86,7 @@
     .hangman-drawing { display: block; width: 100%; max-width: 170px; height: auto; fill: none; stroke: #e4cd91; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
     .word-display { margin: 20px 0; color: var(--gold); font: 700 25px/1.6 system-ui, sans-serif; letter-spacing: 3px; }
     .error { color: #ffb5ad; }
+    /* Reflow navigation and game layouts for smaller screens. */
     @media (max-width: 850px) { .layout { grid-template-columns: 1fr; padding: 14px; } aside { position: static; grid-template-columns: repeat(4, 1fr); } .nav-label { grid-column: 1 / -1; margin-top: 8px; } .nav-button { text-align: center; font-size: 12px; } .roulette-layout { grid-template-columns: 1fr; } .roulette-wheel { max-width: 430px; margin: auto; display: block; } }
     @media (max-width: 480px) {
       header { padding: 13px 15px; }
@@ -105,39 +110,60 @@
   </style>
 </head>
 <body>
+  <!-- Header displays the balance; Save sends the current balance to the game server. -->
   <header>
     <div class="brand"><strong>Game Center</strong><span>Table games & field finder</span></div>
-    <div class="wallet"><label>Gambling balance</label><strong id="wallet">$50</strong><button id="save-terminal" type="button">Save</button><span id="save-status" role="status"></span></div>
+    <div class="wallet"><label>Gambling balance</label><strong id="wallet">$50</strong><button id="save-terminal" type="button">Save balance</button><span id="save-status" role="status"></span></div>
   </header>
   <div class="layout">
+    <!-- Sidebar buttons select a game or utility screen. -->
     <aside aria-label="Game navigation">
       <div class="nav-label">Play</div>
       <button class="nav-button" data-view="guess">Number Guessing</button>
       <button class="nav-button" data-view="hangman">Hangman</button>
       <button class="nav-button" data-view="rps">Rock Paper Scissors</button>
       <button class="nav-button" data-view="dice">Dice Guessing</button>
+      <button class="nav-button" data-view="math">Math Game</button>
+      <button class="nav-button" data-view="stats">Player Stats</button>
       <div class="nav-label">More</div>
       <button class="nav-button" data-view="gambling">Gambling</button>
       <button class="nav-button" data-view="add-money">Add money</button>
       <button class="nav-button" data-view="finder">Field Finder</button>
       <button class="nav-button" data-view="exit">Exit</button>
     </aside>
+    <!-- JavaScript replaces this area with the selected game screen. -->
     <main id="stage" tabindex="-1"></main>
   </div>
 <script>
+// Roulette wheel data and the configured starting field.
 const redNumbers = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 const wheelOrder = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
 const finderQuery = new URLSearchParams(location.search).get('finder');
 const fieldIndex = Number(finderQuery ?? document.documentElement.dataset.finderIndex ?? 0);
 const fieldCount = 21;
+const statGames = {
+  guess: 'Number Guessing',
+  hangman: 'Hangman',
+  rps: 'Rock Paper Scissors',
+  dice: 'Dice Guessing',
+  math: 'Math Game',
+  roulette: 'Roulette',
+  blackjack: 'Blackjack',
+  poker: 'Poker',
+  finder: 'Field Finder',
+};
+// Shared game state: balance, current screen, active game, and game-specific timers/bets.
 let balance = loadBalance();
+let gameStats = loadGameStats();
 let activeView = 'home';
 let session = null;
+let mathTimer = null;
 let rouletteBet = 'red';
 let rouletteNumber = null;
 let rouletteBusy = false;
 const stage = document.getElementById('stage');
 
+// Read the saved balance from this browser, or use the default when none is saved.
 function loadBalance() {
   try {
     const saved = localStorage.getItem('hellBalance');
@@ -145,10 +171,55 @@ function loadBalance() {
   }
   catch { return 50; }
 }
+// Save the balance locally and refresh its display in the header.
 function saveBalance() {
   try { localStorage.setItem('hellBalance', String(balance)); } catch {}
   document.getElementById('wallet').textContent = '$' + balance.toLocaleString();
 }
+// Load saved per-game results from this browser.
+function loadGameStats() {
+  const stats = Object.fromEntries(Object.keys(statGames).map(game => [
+    game,
+    {rounds: 0, wins: 0, losses: 0, ties: 0},
+  ]));
+  try {
+    const saved = JSON.parse(localStorage.getItem('gameCenterStats') || '{}');
+    for (const game of Object.keys(statGames)) {
+      for (const result of ['rounds', 'wins', 'losses', 'ties']) {
+        const value = saved[game]?.[result];
+        if (Number.isSafeInteger(value) && value >= 0) stats[game][result] = value;
+      }
+    }
+  } catch {}
+  return stats;
+}
+// Record a completed round and persist the updated totals in this browser.
+function recordGameResult(game, result) {
+  if (!Object.hasOwn(gameStats, game) || !['wins', 'losses', 'ties'].includes(result)) {
+    throw new Error('Unknown game result.');
+  }
+  gameStats[game].rounds++;
+  gameStats[game][result]++;
+  try {
+    localStorage.setItem('gameCenterStats', JSON.stringify(gameStats));
+  } catch {
+    const status = document.getElementById('save-status');
+    if (status) status.textContent = 'Game stats will not be saved after this session.';
+  }
+}
+// Show saved rounds, wins, losses, and ties for every game.
+function statsPage() {
+  const totals = Object.values(gameStats).reduce((sum, stats) => {
+    for (const result of ['rounds', 'wins', 'losses', 'ties']) sum[result] += stats[result];
+    return sum;
+  }, {rounds: 0, wins: 0, losses: 0, ties: 0});
+  const rows = Object.entries(statGames).map(([game, name]) => {
+    const stats = gameStats[game];
+    return `<tr><td>${name}</td><td>${stats.rounds}</td><td>${stats.wins}</td><td>${stats.losses}</td><td>${stats.ties}</td></tr>`;
+  }).join('');
+  setStage('Player Stats', `<div class="game-controls"><p class="muted">Results are tracked on this device and saved in this browser.</p><section class="guess-bank" aria-label="Player game statistics"><table><thead><tr><th>Game</th><th>Rounds</th><th>Wins</th><th>Losses</th><th>Ties</th></tr></thead><tbody>${rows}<tr class="latest"><th>Total</th><th>${totals.rounds}</th><th>${totals.wins}</th><th>${totals.losses}</th><th>${totals.ties}</th></tr></tbody></table></section></div>`);
+}
+// Send the balance to the optional local game server and show the save result.
 async function saveBalanceToTerminal() {
   saveBalance();
   const status = document.getElementById('save-status');
@@ -168,13 +239,17 @@ async function saveBalanceToTerminal() {
     button.disabled = false;
   }
 }
+// Return a random whole number from 0 up to (but not including) max.
 function randomInt(max) { return Math.floor(Math.random() * max); }
+// Show a screen and highlight its matching sidebar button.
 function setStage(title, content) {
+  if (activeView === 'Math Game' && title !== 'Math Game') stopMathTimer();
   activeView = title;
   document.querySelectorAll('.nav-button').forEach(button => button.classList.toggle('active', button.dataset.view === title));
   stage.innerHTML = `<div class="page-head"><h1>${title === 'home' ? 'Choose a game' : title}</h1></div>${content}`;
   stage.focus({preventScroll: true});
 }
+// Render the main menu with buttons for all games and utilities.
 function home() {
   setStage('home', `<div class="game-grid">
     <button class="game-card" data-open="guess"><strong>Number Guessing</strong><span>Find the hidden number in ten tries.</span></button>
@@ -182,12 +257,14 @@ function home() {
     <button class="game-card" data-open="rps"><strong>Rock Paper Scissors</strong><span>Play a quick round against the house.</span></button>
     <button class="game-card" data-open="dice"><strong>Dice Guessing</strong><span>Call the next roll from one to six.</span></button>
     <button class="game-card" data-open="math"><strong>Math Game</strong><span>Guess the missing number in an equation.</span></button>
+    <button class="game-card" data-open="stats"><strong>Player Stats</strong><span>View your rounds, wins, losses, and ties across games.</span></button>
     <button class="game-card" data-open="gambling"><strong>Gambling</strong><span>Play card, dice, and roulette tables.</span></button>
     <button class="game-card" data-open="finder"><strong>Field Finder</strong><span>Search 21 field scenes for the hidden person.</span></button>
     <button class="game-card" data-open="add-money"><strong>Add money</strong><span>Update your gambling balance.</span></button>
     <button class="game-card" data-open="exit"><strong>Exit</strong><span>Finish your session.</span></button>
   </div>`);
 }
+// Small shared helpers for messages, wagers, and applying balance changes.
 function errorText(id, text) { const target = document.getElementById(id); if (target) target.textContent = text; }
 function wagerPanel() { return `<label>Wager amount<input id="wager" type="number" min="1" max="${balance}" step="1" value="${Math.min(10, balance)}"></label>`; }
 function readWager() {
@@ -196,10 +273,12 @@ function readWager() {
   return amount;
 }
 function settle(net) { balance += net; saveBalance(); }
+// Number guessing game: choose a hidden number and track up to ten attempts.
 function startGuess(gambling = false) {
   session = {target: randomInt(100) + 1, attempts: 0, guesses: [], gambling, wager: null, done: false};
   drawGuess();
 }
+// Build a missing-number arithmetic question for Math Game.
 function makeMathQuestion() {
   const symbol = ['+', '-', '*', '/'][randomInt(4)];
   let number1, number2, answer;
@@ -222,16 +301,28 @@ function makeMathQuestion() {
     correct: hideFirst ? number1 : number2,
   };
 }
+// Stop the active Math Game countdown before changing question or leaving the game.
+function stopMathTimer() {
+  if (mathTimer !== null) {
+    clearInterval(mathTimer);
+    mathTimer = null;
+  }
+}
+// Start Math Game with a new question and a fresh 15-second countdown.
 function startMathGame(score = 0, message = 'Guess the missing number.') {
+  stopMathTimer();
   const question = makeMathQuestion();
-  session = {...question, score, done: false};
+  session = {...question, score, timeLeft: 15, done: false};
   drawMathGame(message);
 }
+// Display the question and handle answer checks, rewards, penalties, and timeout.
 function drawMathGame(message) {
   const s = session;
   setStage('Math Game', `<div class="game-controls">
+    <p class="muted">Fill in the missing number before the 15-second timer ends. Correct answers earn $50; wrong answers and timeouts cost $50.</p>
     <p class="muted">Correct answers: ${s.score}</p>
     <h2>${s.prompt}</h2>
+    <p class="muted" id="math-timer">Time remaining: ${s.timeLeft} seconds</p>
     <div class="form-row"><label>Your answer<input id="math-guess" type="number" step="1" ${s.done ? 'disabled' : ''}></label><button class="action" id="math-submit" ${s.done ? 'disabled' : ''}>Check</button></div>
     <p class="result" id="result">${message}</p>
     ${s.done ? '<button class="action secondary" id="math-next">New question</button>' : ''}
@@ -245,13 +336,17 @@ function drawMathGame(message) {
     }
     const guess = Number(value);
     if (guess === s.correct) {
+      stopMathTimer();
       s.score++;
       s.done = true;
+      recordGameResult('math', 'wins');
       settle(50);
       drawMathGame('Correct! You found the missing number and earned $50.');
     } else {
-      errorText('result', 'Not quite. Try another number.');
-      input.select();
+      stopMathTimer();
+      recordGameResult('math', 'losses');
+      settle(-50);
+      startMathGame(s.score, `Wrong answer. The correct answer was ${s.correct}. You lost $50. Here is a new question.`);
     }
   };
   document.getElementById('math-submit')?.addEventListener('click', submit);
@@ -259,14 +354,34 @@ function drawMathGame(message) {
     if (event.key === 'Enter') submit();
   });
   document.getElementById('math-next')?.addEventListener('click', () => startMathGame(s.score));
+  if (!s.done) {
+    mathTimer = setInterval(() => {
+      if (session !== s || s.done) {
+        stopMathTimer();
+        return;
+      }
+      s.timeLeft--;
+      const timer = document.getElementById('math-timer');
+      if (timer) timer.textContent = `Time remaining: ${s.timeLeft} seconds`;
+      if (s.timeLeft <= 0) {
+        stopMathTimer();
+        recordGameResult('math', 'losses');
+        settle(-50);
+        startMathGame(s.score, `Time is up. The correct answer was ${s.correct}. You lost $50. Here is a new question.`);
+      }
+    }, 1000);
+  }
 }
+// Turn the Number Guessing attempts into rows in the history table.
 function guessHistoryMarkup(guesses) {
   if (guesses.length === 0) return '<tr><td colspan="3" class="muted">No guesses yet.</td></tr>';
   return guesses.map((guess, index) => `<tr class="${index === guesses.length - 1 ? 'latest' : ''}"><td>${index + 1}</td><td>${guess.value}</td><td>${guess.result}</td></tr>`).join('');
 }
+// Display and process one round of Number Guessing.
 function drawGuess(message = 'Enter a number from 1 to 100.') {
   const s = session;
   setStage(s.gambling ? 'Gambling · Number Guessing' : 'Number Guessing', `<div class="game-controls">
+    <p class="muted">Guess the hidden number from 1 to 100. You have 10 tries; the game tells you if each guess is too high or too low.</p>
     <p class="muted">${s.attempts} of 10 guesses used.</p>
     <div class="form-row">${s.gambling && s.wager === null ? wagerPanel() : ''}<label>Your guess<input id="guess-value" type="number" min="1" max="100" ${s.done ? 'disabled' : ''}></label><button class="action" id="guess-submit" ${s.done ? 'disabled' : ''}>Guess</button></div>
     <p class="result" id="result">${message}</p>${s.done ? '<button class="action secondary" data-restart="guess">Play again</button>' : ''}
@@ -278,13 +393,15 @@ function drawGuess(message = 'Enter a number from 1 to 100.') {
     s.attempts++;
     const relation = value === s.target ? 'Correct' : value < s.target ? 'Too low' : 'Too high';
     s.guesses.push({value, result: relation});
-    if (value === s.target) { if (s.gambling) settle(s.wager); s.done = true; drawGuess(`Correct. The number was ${s.target}.${s.gambling ? ` You won $${s.wager}.` : ''}`); }
-    else if (s.attempts >= 10) { if (s.gambling) settle(-s.wager); s.done = true; drawGuess(`Out of guesses. The number was ${s.target}.${s.gambling ? ` You lost $${s.wager}.` : ''}`); }
+    if (value === s.target) { recordGameResult('guess', 'wins'); if (s.gambling) settle(s.wager); s.done = true; drawGuess(`Correct. The number was ${s.target}.${s.gambling ? ` You won $${s.wager}.` : ''}`); }
+    else if (s.attempts >= 10) { recordGameResult('guess', 'losses'); if (s.gambling) settle(-s.wager); s.done = true; drawGuess(`Out of guesses. The number was ${s.target}.${s.gambling ? ` You lost $${s.wager}.` : ''}`); }
     else drawGuess(`${value < s.target ? 'Too low' : 'Too high'}. ${10 - s.attempts} guesses left.`);
   });
   document.getElementById('guess-value')?.addEventListener('keydown', event => { if (event.key === 'Enter') document.getElementById('guess-submit').click(); });
 }
+// Words that can be selected as the hidden Hangman answer.
 const wordList = ['python','computer','hangman','student','programming','keyboard','library','science','coffee','planet','rocket','garden','forest','ocean','mountain','pencil','notebook','rainbow','bicycle','universe','language','adventure','backpack','journey','picture','machine','browser','database','learning','festival','camera','castle','butterfly','puzzle','village','harbor','bridge','concert','guitar','piano','victory','orange','banana','strawberry','tomato','sandwich'];
+// Start Hangman, draw its progress, and process letter choices.
 function startHangman(gambling = false) { session = {word: wordList[randomInt(wordList.length)], letters: [], wrong: 0, gambling, wager: null, done: false}; drawHangman(); }
 function hangmanDrawing(wrong) {
   const reveal = (mistake, markup) => wrong >= mistake ? markup : '';
@@ -298,57 +415,64 @@ function hangmanDrawing(wrong) {
     ${reveal(6, '<path d="M118 94 L140 122"/>')}
   </svg>`;
 }
+// Draw the current Hangman word, keyboard, and number of mistakes.
 function drawHangman(message = '') {
   const s = session;
   const display = [...s.word].map(letter => s.letters.includes(letter) ? letter : '_').join(' ');
   const keyboard = 'abcdefghijklmnopqrstuvwxyz'.split('').map(letter => `<button data-letter="${letter}" ${s.letters.includes(letter) || s.done ? 'disabled' : ''}>${letter.toUpperCase()}</button>`).join('');
-  setStage(s.gambling ? 'Gambling · Hangman' : 'Hangman', `<div class="game-controls">${s.gambling && s.wager === null ? `<div class="form-row">${wagerPanel()}</div>` : ''}<div class="hangman-layout">${hangmanDrawing(s.wrong)}<div><p class="muted">Mistakes: ${s.wrong} / 6</p><div class="word-display">${display}</div><p class="muted">Guessed: ${s.letters.join(', ') || 'None'}</p><div class="letter-grid">${keyboard}</div><p class="result" id="result">${message}</p>${s.done ? '<button class="action secondary" data-restart="hangman">Play again</button>' : ''}</div></div></div>`);
+  setStage(s.gambling ? 'Gambling · Hangman' : 'Hangman', `<div class="game-controls">${s.gambling && s.wager === null ? `<div class="form-row">${wagerPanel()}</div>` : ''}<p class="muted">Choose letters to reveal the hidden word. You can make up to 6 mistakes.</p><div class="hangman-layout">${hangmanDrawing(s.wrong)}<div><p class="muted">Mistakes: ${s.wrong} / 6</p><div class="word-display">${display}</div><p class="muted">Guessed: ${s.letters.join(', ') || 'None'}</p><div class="letter-grid">${keyboard}</div><p class="result" id="result">${message}</p>${s.done ? '<button class="action secondary" data-restart="hangman">Play again</button>' : ''}</div></div></div>`);
   stage.querySelectorAll('[data-letter]').forEach(button => button.addEventListener('click', () => {
     if (s.gambling && s.wager === null) { s.wager = readWager(); if (s.wager === null) return; }
     const letter = button.dataset.letter; s.letters.push(letter);
     if (!s.word.includes(letter)) s.wrong++;
     const won = [...new Set(s.word)].every(item => s.letters.includes(item));
-    if (won) { s.done = true; if (s.gambling) settle(s.wager); drawHangman(`You found ${s.word}.${s.gambling ? ` You won $${s.wager}.` : ''}`); }
-    else if (s.wrong >= 6) { s.done = true; if (s.gambling) settle(-s.wager); drawHangman(`The word was ${s.word}.${s.gambling ? ` You lost $${s.wager}.` : ''}`); }
+    if (won) { recordGameResult('hangman', 'wins'); s.done = true; if (s.gambling) settle(s.wager); drawHangman(`You found ${s.word}.${s.gambling ? ` You won $${s.wager}.` : ''}`); }
+    else if (s.wrong >= 6) { recordGameResult('hangman', 'losses'); s.done = true; if (s.gambling) settle(-s.wager); drawHangman(`The word was ${s.word}.${s.gambling ? ` You lost $${s.wager}.` : ''}`); }
     else drawHangman();
   }));
 }
+// Start and draw Rock Paper Scissors; compare the player's move with a random move.
 function startRps(gambling = false) {
-  session = {gambling, wager:null, score:[0,0], done:false};
+  session = {gambling, wager:null, score:[0,0], ties:0, done:false};
   drawRps();
 }
 function drawRps(message = 'Choose your move.') {
   const s = session;
-  setStage(s.gambling ? 'Gambling · Rock Paper Scissors' : 'Rock Paper Scissors', `<div class="game-controls">${s.gambling && s.wager === null ? `<div class="form-row">${wagerPanel()}</div>` : ''}<p class="muted">You ${s.score[0]} — House ${s.score[1]}</p><div class="option-row">${['rock','paper','scissors'].map(choice => `<button class="choice" data-rps="${choice}" ${s.gambling && s.done ? 'disabled' : ''}>${choice[0].toUpperCase()+choice.slice(1)}</button>`).join('')}</div><p class="result" id="result">${message}</p>${s.gambling && s.done ? '<button class="action secondary" data-open="gambling">Back to gambling</button>' : ''}</div>`);
+  setStage(s.gambling ? 'Gambling · Rock Paper Scissors' : 'Rock Paper Scissors', `<div class="game-controls">${s.gambling && s.wager === null ? `<div class="form-row">${wagerPanel()}</div>` : ''}<p class="muted">Choose rock, paper, or scissors. Rock beats scissors, scissors beats paper, and paper beats rock.</p><p class="muted">You ${s.score[0]} — House ${s.score[1]} — Ties ${s.ties}</p><div class="option-row">${['rock','paper','scissors'].map(choice => `<button class="choice" data-rps="${choice}" ${s.gambling && s.done ? 'disabled' : ''}>${choice[0].toUpperCase()+choice.slice(1)}</button>`).join('')}</div><p class="result" id="result">${message}</p>${s.gambling && s.done ? '<button class="action secondary" data-open="gambling">Back to gambling</button>' : ''}</div>`);
   stage.querySelectorAll('[data-rps]').forEach(button => button.addEventListener('click', () => {
     if (s.gambling && s.wager === null) { s.wager = readWager(); if (s.wager === null) return; }
     const yours = button.dataset.rps; const house = ['rock','paper','scissors'][randomInt(3)];
     const won = (yours === 'rock' && house === 'scissors') || (yours === 'paper' && house === 'rock') || (yours === 'scissors' && house === 'paper');
     const tied = yours === house;
-    if (won) { s.score[0]++; if (s.gambling) settle(s.wager); }
-    else if (!tied) { s.score[1]++; if (s.gambling) settle(-s.wager); }
+    if (won) { recordGameResult('rps', 'wins'); s.score[0]++; if (s.gambling) settle(s.wager); }
+    else if (tied) { recordGameResult('rps', 'ties'); s.ties++; }
+    else { recordGameResult('rps', 'losses'); s.score[1]++; if (s.gambling) settle(-s.wager); }
     if (s.gambling) s.done = true;
-    drawRps(`You chose ${yours}; house chose ${house}. ${tied ? 'Tie.' : won ? `You win${s.gambling ? ` $${s.wager}` : ''}.` : `House wins${s.gambling ? `; you lose $${s.wager}` : ''}.`}`);
+    drawRps(`You chose ${yours}; house chose ${house}. ${tied ? `Tie number ${s.ties}.` : won ? `You win${s.gambling ? ` $${s.wager}` : ''}.` : `House wins${s.gambling ? `; you lose $${s.wager}` : ''}.`}`);
   }));
 }
+// Roll a six-sided die and compare it with the player's guess.
 function startDice(gambling = false) {
-  setStage(gambling ? 'Gambling · Dice Guessing' : 'Dice Guessing', `<div class="game-controls"><div class="form-row">${gambling ? wagerPanel() : ''}<label>Guess (1–6)<input id="dice-guess" type="number" min="1" max="6" step="1" value="3"></label><button class="action" id="dice-roll">Roll</button></div><p class="result" id="result">Call the roll.</p></div>`);
+  setStage(gambling ? 'Gambling · Dice Guessing' : 'Dice Guessing', `<div class="game-controls"><p class="muted">Guess the number that will come up on a six-sided die. In gambling mode, a correct guess wins your wager and a wrong guess loses it.</p><div class="form-row">${gambling ? wagerPanel() : ''}<label>Guess (1–6)<input id="dice-guess" type="number" min="1" max="6" step="1" value="3"></label><button class="action" id="dice-roll">Roll</button></div><p class="result" id="result">Call the roll.</p></div>`);
   document.getElementById('dice-roll').addEventListener('click', () => {
     const guess = Number(document.getElementById('dice-guess').value);
     if (!Number.isInteger(guess) || guess < 1 || guess > 6) { errorText('result', 'Choose a whole number from 1 to 6.'); return; }
     const bet = gambling ? readWager() : 0; if (gambling && bet === null) return;
     const roll = randomInt(6) + 1, won = guess === roll;
+    recordGameResult('dice', won ? 'wins' : 'losses');
     if (gambling) settle(won ? bet : -bet);
     errorText('result', `The die rolled ${roll}. ${won ? `Correct${gambling ? `, you won $${bet}` : ''}.` : `Not this time${gambling ? `, you lost $${bet}` : ''}.`}`);
   });
 }
+// Let the player set a starting balance and add funds.
 function addMoneyPage() {
-  setStage('Add money', `<div class="game-controls"><p class="muted">Your balance is $${balance.toLocaleString()}.</p><div class="form-row"><label>Starting balance<input id="base-balance" value="${balance}" inputmode="decimal"></label><label>Amount to add<input id="add-amount" value="500" inputmode="decimal"></label><button class="action" id="add-money">Update balance</button></div><p class="result" id="result"></p></div>`);
+  setStage('Add money', `<div class="game-controls"><p class="muted">Set a new starting balance, then choose how much to add. Amounts can use k, m, or b (for example, 2.5m).</p><p class="muted">Your current balance is $${balance.toLocaleString()}.</p><div class="form-row"><label>Starting balance<input id="base-balance" value="${balance}" inputmode="decimal"></label><label>Amount to add<input id="add-amount" value="500" inputmode="decimal"></label><button class="action" id="add-money">Update balance</button></div><p class="result" id="result"></p></div>`);
   document.getElementById('add-money').addEventListener('click', () => {
     try { const base = parseMoney(document.getElementById('base-balance').value); const addition = parseMoney(document.getElementById('add-amount').value); balance = base + addition; saveBalance(); errorText('result', `Balance updated to $${balance.toLocaleString()}.`); }
     catch { errorText('result', 'Enter valid amounts such as 500, 1k, or 2.5m.'); }
   });
 }
+// Convert a balance entry such as "2.5m" into a whole number of dollars.
 function parseMoney(value) {
   const input = String(value).trim().toLowerCase().replaceAll('$','');
   const suffix = input.slice(-1), scale = {k:1e3,m:1e6,b:1e9}[suffix] || 1;
@@ -357,11 +481,21 @@ function parseMoney(value) {
   if (!numeric || !Number.isSafeInteger(valueNumber) || valueNumber < 0) throw new Error('invalid amount');
   return valueNumber;
 }
+// List wager-based games and connect each menu card to its game.
 function gamblingMenu() {
-  const casino = [['dice','Dice Guessing'],['poker','Poker'],['blackjack','Blackjack'],['guess','Number Guessing'],['hangman','Hangman'],['rps','Rock Paper Scissors'],['roulette','Roulette']];
-  setStage('Gambling', `<p class="muted">Balance: $${balance.toLocaleString()}</p><div class="game-grid">${casino.map(([key,label]) => `<button class="game-card" data-casino="${key}"><strong>${label}</strong><span>Play for a wager</span></button>`).join('')}<button class="game-card" data-open="add-money"><strong>Add money</strong><span>Update your gambling balance.</span></button><button class="game-card" data-open="home"><strong>Leave gambling</strong><span>Return to the game center.</span></button></div>`);
+  const casino = [
+    ['dice','Dice Guessing','Guess a die roll; win or lose your wager.'],
+    ['poker','Poker','Compare five-card hands; the stronger hand wins.'],
+    ['blackjack','Blackjack','Get closer to 21 than the dealer without going over.'],
+    ['guess','Number Guessing','Find the hidden number in up to 10 guesses.'],
+    ['hangman','Hangman','Reveal the word before making 6 mistakes.'],
+    ['rps','Rock Paper Scissors','Choose a move and try to beat the house.'],
+    ['roulette','Roulette','Bet on a number or outcome, then spin the wheel.'],
+  ];
+  setStage('Gambling', `<p class="muted">Choose a game to play using your balance of $${balance.toLocaleString()}. Enter a wager when prompted; wins and losses change your balance.</p><div class="game-grid">${casino.map(([key,label,description]) => `<button class="game-card" data-casino="${key}"><strong>${label}</strong><span>${description}</span></button>`).join('')}<button class="game-card" data-open="add-money"><strong>Add money</strong><span>Set a starting balance and add funds.</span></button><button class="game-card" data-open="home"><strong>Leave gambling</strong><span>Return to the game center.</span></button></div>`);
   stage.querySelectorAll('[data-casino]').forEach(button => button.addEventListener('click', () => launchCasino(button.dataset.casino)));
 }
+// Start the selected casino game in wager mode.
 function launchCasino(game) {
   if (game === 'dice') startDice(true);
   else if (game === 'guess') startGuess(true);
@@ -371,6 +505,7 @@ function launchCasino(game) {
   else if (game === 'poker') pokerPage();
   else if (game === 'blackjack') blackjackPage();
 }
+// Shuffle field positions and ensure the hidden target moves to a new position.
 function shuffleFieldOrder(previousOrder, hiddenSource) {
   const order = Array.from({length:fieldCount}, (_, index) => index);
   for (let index = order.length - 1; index > 0; index--) {
@@ -384,6 +519,7 @@ function shuffleFieldOrder(previousOrder, hiddenSource) {
   }
   return order;
 }
+// Render Field Finder and handle selections until the hidden field is found.
 function finderPage(fieldOrder = Array.from({length:fieldCount}, (_, index) => index), hiddenSource = fieldIndex >= 0 && fieldIndex < fieldCount ? fieldIndex : randomInt(fieldCount), shuffled = false) {
   session = {target:fieldOrder.indexOf(hiddenSource), hiddenSource, fieldOrder, attempts:0, done:false};
   const cards = Array.from({length:fieldCount}, (_,index) => {
@@ -391,7 +527,7 @@ function finderPage(fieldOrder = Array.from({length:fieldCount}, (_, index) => i
     const fieldPosition = (index / 2).toFixed(1);
     return `<button class="field-card ${shuffled ? 'shuffle-in' : ''}" style="--shuffle-index:${index}" data-field="${index}"><img src="../fields/field_${sourcePosition}.svg" alt="Field ${fieldPosition} scene"><span>Field ${fieldPosition}</span></button>`;
   }).join('');
-  setStage('Field Finder', `<p class="muted">Find the hidden person among 21 fields.</p><div class="field-grid">${cards}</div><p class="result" id="result">Choose a field.</p>`);
+  setStage('Field Finder', `<p class="muted">Find the hidden person among 21 fields. Click a field to search it; a wrong choice is removed, and finding the person reshuffles the fields for a new round.</p><div class="field-grid">${cards}</div><p class="result" id="result">Choose a field.</p>`);
   stage.querySelectorAll('[data-field]').forEach(button => button.addEventListener('click', () => {
     if (session.done) return;
     session.attempts++;
@@ -404,10 +540,11 @@ function finderPage(fieldOrder = Array.from({length:fieldCount}, (_, index) => i
     else { button.disabled = true; button.classList.add('selected'); errorText('result', `Not there. ${fieldCount - session.attempts} fields remain.`); }
   }));
 }
+// Build the roulette table and wheel, and connect its bet and spin controls.
 function roulettePage() {
   rouletteBet = 'red'; rouletteNumber = null; rouletteBusy = false;
   const cells = `<button class="number-cell green" data-number="0">0</button>` + Array.from({length:36},(_,i) => { const n=i+1; return `<button class="number-cell ${redNumbers.has(n)?'red':''}" data-number="${n}">${n}</button>`; }).join('');
-  setStage('Gambling · Roulette', `<div class="roulette-layout"><section><svg class="roulette-wheel" viewBox="0 0 500 500" aria-label="Roulette wheel"><circle cx="250" cy="250" r="235" fill="#171817" stroke="#b08a4c" stroke-width="10"/><g id="wheel-spin"><circle cx="250" cy="250" r="220" fill="#302619" stroke="#e1c477" stroke-width="4"/><g id="pockets"></g><circle cx="250" cy="250" r="188" fill="none" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="145" fill="#bd9852" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="75" fill="#17241e" stroke="#e0c276" stroke-width="3"/><text x="250" y="246" class="wheel-title">EUROPEAN</text><text x="250" y="270" class="wheel-subtitle">SINGLE ZERO</text></g><g id="ball-spin"><circle class="ball" cx="250" cy="73" r="6"/></g><path class="pointer" d="M250 12 L239 38 L261 38 Z"/></svg><p class="result" id="roulette-result">Choose a bet and spin.</p></section><section><h2>Betting table</h2><p class="muted">Select a number or outside bet.</p><div class="number-grid" id="roulette-numbers">${cells}</div><div class="roulette-options">${[['red','Red'],['black','Black'],['even','Even'],['odd','Odd'],['low','Low · 1–18'],['high','High · 19–36']].map(([key,label])=>`<button class="choice" data-roulette-bet="${key}">${label}</button>`).join('')}</div><div class="form-row"><label>Wager amount<input id="roulette-wager" type="number" min="1" max="${balance}" value="${Math.min(10,balance)}"></label><button id="roulette-spin" class="action">Spin</button></div></section></div>`);
+  setStage('Gambling · Roulette', `<div class="roulette-layout"><section><svg class="roulette-wheel" viewBox="0 0 500 500" aria-label="Roulette wheel"><circle cx="250" cy="250" r="235" fill="#171817" stroke="#b08a4c" stroke-width="10"/><g id="wheel-spin"><circle cx="250" cy="250" r="220" fill="#302619" stroke="#e1c477" stroke-width="4"/><g id="pockets"></g><circle cx="250" cy="250" r="188" fill="none" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="145" fill="#bd9852" stroke="#f0d58b" stroke-width="4"/><circle cx="250" cy="250" r="75" fill="#17241e" stroke="#e0c276" stroke-width="3"/><text x="250" y="246" class="wheel-title">EUROPEAN</text><text x="250" y="270" class="wheel-subtitle">SINGLE ZERO</text></g><g id="ball-spin"><circle class="ball" cx="250" cy="73" r="6"/></g><path class="pointer" d="M250 12 L239 38 L261 38 Z"/></svg><p class="result" id="roulette-result">Choose a bet and spin.</p></section><section><h2>Betting table</h2><p class="muted">Choose a number on the grid or an outcome below, enter your wager, then spin. Exact-number bets pay 35 to 1; color, even/odd, and low/high bets pay 1 to 1. Zero wins only on an exact-number bet.</p><div class="number-grid" id="roulette-numbers">${cells}</div><div class="roulette-options">${[['red','Red'],['black','Black'],['even','Even'],['odd','Odd'],['low','Low · 1–18'],['high','High · 19–36']].map(([key,label])=>`<button class="choice" data-roulette-bet="${key}">${label}</button>`).join('')}</div><div class="form-row"><label>Wager amount<input id="roulette-wager" type="number" min="1" max="${balance}" value="${Math.min(10,balance)}"></label><button id="roulette-spin" class="action">Spin</button></div></section></div>`);
   const svgNS = 'http://www.w3.org/2000/svg';
   const pockets = document.getElementById('pockets');
   wheelOrder.forEach((number, index) => {
@@ -448,12 +585,14 @@ function roulettePage() {
   updateRouletteSelection();
   document.getElementById('roulette-spin').addEventListener('click', spinRoulette);
 }
+// Update the visual selection and disable spinning when the bet is incomplete.
 function updateRouletteSelection() {
   document.querySelectorAll('[data-roulette-bet]').forEach(button => button.classList.toggle('selected', button.dataset.rouletteBet === rouletteBet));
   document.querySelectorAll('[data-number]').forEach(button => button.classList.toggle('selected', rouletteBet === 'number' && Number(button.dataset.number) === rouletteNumber));
   const spin = document.getElementById('roulette-spin');
   if (spin) spin.disabled = rouletteBusy || balance < 1 || (rouletteBet === 'number' && rouletteNumber === null);
 }
+// Animate the roulette spin, decide whether the bet won, and update the balance.
 async function spinRoulette() {
   const wager = Number(document.getElementById('roulette-wager').value);
   if (!Number.isInteger(wager) || wager < 1 || wager > balance) { errorText('roulette-result', 'Enter a whole-number wager within your balance.'); return; }
@@ -477,6 +616,7 @@ async function spinRoulette() {
     (rouletteBet === 'low' && number >= 1 && number <= 18) ||
     (rouletteBet === 'high' && number >= 19 && number <= 36);
   const payout = won ? (rouletteBet === 'number' ? wager * 35 : wager) : 0;
+  recordGameResult('roulette', won ? 'wins' : 'losses');
   settle(won ? payout : -wager);
   document.querySelectorAll('[data-number]').forEach(button => button.classList.toggle('winner', Number(button.dataset.number) === number));
   const detail = number === 0 ? 'Zero' : `${number % 2 === 0 ? 'Even' : 'Odd'}, ${number <= 18 ? 'Low' : 'High'}`;
@@ -484,26 +624,30 @@ async function spinRoulette() {
   rouletteBusy = false;
   updateRouletteSelection();
 }
+// Create and shuffle a standard 52-card deck.
 function createDeck() {
   const deck = [];
   for (const suit of ['Hearts', 'Diamonds', 'Clubs', 'Spades']) for (let value = 2; value <= 14; value++) deck.push({suit, value});
   for (let index = deck.length - 1; index > 0; index--) { const swap = randomInt(index + 1); [deck[index], deck[swap]] = [deck[swap], deck[index]]; }
   return deck;
 }
+// Format a card as a playing-card element, including its suit and color.
 function cardLabel(card) {
   const value = ({11:'J',12:'Q',13:'K',14:'A'})[card.value] || card.value;
   const suit = ({Hearts:'♥',Diamonds:'♦',Clubs:'♣',Spades:'♠'})[card.suit];
   return `<div class="playing-card ${card.suit === 'Hearts' || card.suit === 'Diamonds' ? 'red-suit' : ''}">${value}<br>${suit}</div>`;
 }
+// Calculate a Blackjack hand total, lowering aces from 11 to 1 when needed.
 function handValue(hand) {
   let total = 0, aces = 0;
   for (const card of hand) { if (card.value === 14) { total += 11; aces++; } else total += Math.min(card.value, 10); }
   while (total > 21 && aces > 0) { total -= 10; aces--; }
   return total;
 }
+// Deal the Blackjack hands after validating the player's wager.
 function blackjackPage() {
   session = {wager: null, deck: [], player: [], dealer: [], done: false};
-  setStage('Gambling · Blackjack', `<div class="game-controls"><div class="form-row">${wagerPanel()}<button class="action" id="deal-blackjack">Deal</button></div><p class="result" id="result">Place your wager and deal.</p></div>`);
+  setStage('Gambling · Blackjack', `<div class="game-controls"><p class="muted">Try to get a card total closer to 21 than the dealer without going over. Aces count as 1 or 11; face cards count as 10. Choose Hit to take a card or Stand to keep your total.</p><div class="form-row">${wagerPanel()}<button class="action" id="deal-blackjack">Deal</button></div><p class="result" id="result">Place your wager and deal.</p></div>`);
   document.getElementById('deal-blackjack').addEventListener('click', () => {
     const wager = readWager(); if (wager === null) return;
     session.wager = wager; session.deck = createDeck();
@@ -512,15 +656,18 @@ function blackjackPage() {
     else drawBlackjack();
   });
 }
+// Settle the Blackjack outcome and show the completed hands.
 function finishBlackjack(outcome, message) {
+  recordGameResult('blackjack', outcome > 0 ? 'wins' : outcome < 0 ? 'losses' : 'ties');
   if (outcome !== 0) settle(outcome > 0 ? session.wager : -session.wager);
   session.done = true;
   session.message = `${message} Player ${handValue(session.player)}, dealer ${handValue(session.dealer)}.${outcome > 0 ? ` You won $${session.wager}.` : outcome < 0 ? ` You lost $${session.wager}.` : ' Push.'}`;
   drawBlackjack();
 }
+// Display the Blackjack hands and process Hit or Stand.
 function drawBlackjack() {
   const s = session;
-  setStage('Gambling · Blackjack', `<div class="game-controls"><p class="muted">Dealer · ${s.dealer.length ? handValue(s.dealer) : ''}</p><div class="cards">${s.dealer.map(cardLabel).join('')}</div><p class="muted">Player · ${s.player.length ? handValue(s.player) : ''}</p><div class="cards">${s.player.map(cardLabel).join('')}</div><p class="result" id="result">${s.message || ''}</p>${s.done ? '<button class="action secondary" data-open="gambling">Back to gambling</button>' : '<div class="option-row"><button class="action" id="hit">Hit</button><button class="action secondary" id="stand">Stand</button></div>'}</div>`);
+  setStage('Gambling · Blackjack', `<div class="game-controls"><p class="muted">Hit takes another card; Stand ends your turn and lets the dealer play. Get closer to 21 than the dealer without going over.</p><p class="muted">Dealer · ${s.dealer.length ? handValue(s.dealer) : ''}</p><div class="cards">${s.dealer.map(cardLabel).join('')}</div><p class="muted">Player · ${s.player.length ? handValue(s.player) : ''}</p><div class="cards">${s.player.map(cardLabel).join('')}</div><p class="result" id="result">${s.message || ''}</p>${s.done ? '<button class="action secondary" data-open="gambling">Back to gambling</button>' : '<div class="option-row"><button class="action" id="hit">Hit</button><button class="action secondary" id="stand">Stand</button></div>'}</div>`);
   if (s.done) return;
   document.getElementById('hit').addEventListener('click', () => {
     s.player.push(s.deck.pop());
@@ -532,6 +679,7 @@ function drawBlackjack() {
     finishBlackjack(dealer > 21 || player > dealer ? 1 : player < dealer ? -1 : 0, dealer > 21 ? 'Dealer busted.' : 'Hand complete.');
   });
 }
+// Rank a five-card Poker hand; larger score arrays represent stronger hands.
 function pokerScore(hand) {
   const values = hand.map(card => card.value).sort((a,b) => b-a);
   const counts = new Map();
@@ -552,22 +700,27 @@ function pokerScore(hand) {
   if (groups[0][1] === 2) return [1, groups[0][0], ...groups.slice(1).map(group => group[0]).sort((a,b)=>b-a)];
   return [0, ...values];
 }
+// Convert a Poker hand rank into a readable name.
 function pokerRankName(rank) { return ['High Card','One Pair','Two Pair','Three of a Kind','Straight','Flush','Full House','Four of a Kind','Straight Flush'][rank]; }
+// Compare two Poker score arrays, returning positive/negative for the winner.
 function compareScores(first, second) {
   for (let index=0; index<Math.max(first.length,second.length); index++) { const difference=(first[index]||0)-(second[index]||0); if (difference) return difference; }
   return 0;
 }
+// Deal and compare the player's and house's Poker hands.
 function pokerPage() {
-  setStage('Gambling · Poker', `<div class="game-controls"><div class="form-row">${wagerPanel()}<button class="action" id="deal-poker">Deal hands</button></div><div id="poker-hands"></div><p class="result" id="result">Five cards each. Best hand wins.</p></div>`);
+  setStage('Gambling · Poker', `<div class="game-controls"><p class="muted">Place a wager and deal five cards to you and the house. The stronger poker hand wins; a tie returns your wager.</p><div class="form-row">${wagerPanel()}<button class="action" id="deal-poker">Deal hands</button></div><div id="poker-hands"></div><p class="result" id="result">Five cards each. Best hand wins.</p></div>`);
   document.getElementById('deal-poker').addEventListener('click', () => {
     const wager=readWager();if(wager===null)return;
     const deck=createDeck(), player=Array.from({length:5},()=>deck.pop()), dealer=Array.from({length:5},()=>deck.pop());
     const playerScore=pokerScore(player), dealerScore=pokerScore(dealer), comparison=compareScores(playerScore,dealerScore);
+    recordGameResult('poker', comparison > 0 ? 'wins' : comparison < 0 ? 'losses' : 'ties');
     if(comparison>0)settle(wager);else if(comparison<0)settle(-wager);
     document.getElementById('poker-hands').innerHTML=`<h3>Your hand · ${pokerRankName(playerScore[0])}</h3><div class="cards">${player.map(cardLabel).join('')}</div><h3>House hand · ${pokerRankName(dealerScore[0])}</h3><div class="cards">${dealer.map(cardLabel).join('')}</div>`;
     errorText('result',comparison>0?`You win $${wager}.`:comparison<0?`House wins; you lose $${wager}.`:'Tie. Your wager is returned.');
   });
 }
+// Alternate Field Finder view that uses the current configured field target.
 function finderPage() {
   const target = Number.isInteger(fieldIndex) && fieldIndex >= 0 && fieldIndex < fieldCount ? fieldIndex : randomInt(fieldCount);
   session = {target, attempts:0, done:false};
@@ -579,16 +732,18 @@ function finderPage() {
   stage.querySelectorAll('[data-field]').forEach(button => button.addEventListener('click', () => {
     if (session.done) return;
     session.attempts++;
-    if (Number(button.dataset.field) === session.target) { session.done = true; errorText('result', `Found in field ${(session.target/2).toFixed(1)} after ${session.attempts} guesses.`); }
+    if (Number(button.dataset.field) === session.target) { recordGameResult('finder', 'wins'); session.done = true; errorText('result', `Found in field ${(session.target/2).toFixed(1)} after ${session.attempts} guesses.`); }
     else { button.disabled = true; button.classList.add('selected'); errorText('result', `Not there. ${fieldCount - session.attempts} fields remain.`); }
   }));
 }
+// Finish the session, reset the balance, and notify the local game server.
 function exitPage() {
   balance = 50;
   saveBalance();
   fetch('/finish', {method: 'POST'}).catch(() => {});
   setStage('Exit', '<p class="muted">Your session is complete. Your balance has reset to $50.</p>');
 }
+// Route a menu selection to the requested screen or game.
 function openView(view) {
   if (view === 'home') home();
   else if (view === 'guess') startGuess();
@@ -596,11 +751,13 @@ function openView(view) {
   else if (view === 'rps') startRps();
   else if (view === 'dice') startDice();
   else if (view === 'math') startMathGame();
+  else if (view === 'stats') statsPage();
   else if (view === 'gambling') gamblingMenu();
   else if (view === 'add-money') addMoneyPage();
   else if (view === 'finder') finderPage();
   else if (view === 'exit') exitPage();
 }
+// Connect sidebar, page buttons, and balance saving to their event handlers.
 document.querySelector('aside').addEventListener('click', event => { const button=event.target.closest('[data-view]');if(button)openView(button.dataset.view); });
 document.getElementById('save-terminal').addEventListener('click', saveBalanceToTerminal);
 stage.addEventListener('click', event => {
@@ -612,6 +769,7 @@ stage.addEventListener('click', event => {
   else if (restart.dataset.restart === 'hangman') startHangman(session.gambling);
 });
 home();saveBalance();
+// Notify the local server when the game center is closed.
 window.addEventListener('pagehide', () => {
   if (location.hostname === '127.0.0.1') navigator.sendBeacon('/finish', new Blob([], {type: 'application/json'}));
 });

@@ -17,7 +17,11 @@
 
 
 :------------------------------------------------------------------- |
-| **Name**          | Assignment A07-Trik                            |
+| **Name**          | Assignment A06-Trik                            |
 | **Self Grade**    | 20/20                                          |
-| **Justification** | complete         |
+| **Justification** | complete         | did work 
 
+| **Name**          | Assignment A New Alphabet                      |
+| **Status**        | Accepted                                       |
+| **Self Grade**    | 17/20                                          |
+| **Justification** | Solution, three unit tests, and three added local test cases pass; Kattis accepted the submission. Deducted 3 points because the requested screenshots are not included. |
