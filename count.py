@@ -1,3 +1,5 @@
+##formating for other games 
+
 print("need numbers")
 user_input = input("Enter a number, or type 'quit': ").strip().lower()
 
