@@ -258,12 +258,12 @@ def draw_game():
             final_score.get_rect(center=(WIDTH//2, HEIGHT//2))
         )
 
-        if game_over:
-            restart_message = font.render("Press R to restart", True, YELLOW)
-            screen.blit(
-                restart_message,
-                restart_message.get_rect(center=(WIDTH//2, HEIGHT//2 + 24))
-            )
+        restart_text = "Press R to play again" if won else "Press R to restart"
+        restart_message = font.render(restart_text, True, YELLOW)
+        screen.blit(
+            restart_message,
+            restart_message.get_rect(center=(WIDTH//2, HEIGHT//2 + 24))
+        )
 
     pygame.display.flip()
 
@@ -286,7 +286,7 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif game_over and event.key == pygame.K_r:
+                elif (game_over or won) and event.key == pygame.K_r:
                     restart_game()
                 elif event.key == pygame.K_UP:
                     next_direction = (0, -1)
@@ -310,6 +310,9 @@ def main():
                     score=score+100
                 elif event.key == pygame.K_RSHIFT:
                      score=score-100
+                elif event.key == pygame.K_r:
+                    if won ==False or game_over == False:
+                        game_over==true 
           
 
         if not game_over and not won:
