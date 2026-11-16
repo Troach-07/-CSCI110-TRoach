@@ -245,12 +245,25 @@ def draw_game():
     screen.blit(info, (10, HEIGHT-40))
 
     if game_over or won:
-        message = "YOU WIN!" if won else "GAME OVER - Press R to restart"
+        message = "YOU WIN!" if won else "GAME OVER"
         text = font.render(message, True, YELLOW)
         screen.blit(
             text,
-            text.get_rect(center=(WIDTH//2, HEIGHT//2))
+            text.get_rect(center=(WIDTH//2, HEIGHT//2 - 24))
         )
+
+        final_score = font.render(f"Final score: {score}", True, WHITE)
+        screen.blit(
+            final_score,
+            final_score.get_rect(center=(WIDTH//2, HEIGHT//2))
+        )
+
+        if game_over:
+            restart_message = font.render("Press R to restart", True, YELLOW)
+            screen.blit(
+                restart_message,
+                restart_message.get_rect(center=(WIDTH//2, HEIGHT//2 + 24))
+            )
 
     pygame.display.flip()
 
@@ -356,6 +369,7 @@ def main():
                 for cell in row
             ):
                 won = True
+            
 
         draw_game()
         # Cap rendering speed without tying movement timing to the frame rate.
