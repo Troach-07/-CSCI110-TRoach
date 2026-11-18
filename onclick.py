@@ -1,15 +1,10 @@
 from pynput import keyboard, mouse
-import time
 import sys
 
 
 position = [0, 0]
 GRID_SIZE = 20
 
-
-def packman():
-    if keyboard.Key.down:
-        
 
 def on_press(key):
     if key == keyboard.Key.esc:
@@ -19,19 +14,22 @@ def on_press(key):
     y = position[1]
     if key == keyboard.Key.up:
         position[1] = (y - 1) % GRID_SIZE
-    if key == keyboard.Key.down:
+    elif key == keyboard.Key.down:
         position[1] = (y + 1) % GRID_SIZE
-    if key == keyboard.Key.right:
+    elif key == keyboard.Key.right:
         position[0] = (x + 1) % GRID_SIZE
-    if key == keyboard.Key.left:
+    elif key == keyboard.Key.left:
         position[0] = (x - 1) % GRID_SIZE
-    if key in (
-        keyboard.Key.up,
-        keyboard.Key.down,
-        keyboard.Key.left,
-        keyboard.Key.right,
-    ):
+    else:
+        return
+
+    if key in (keyboard.Key.up, keyboard.Key.down, keyboard.Key.left, keyboard.Key.right):
         print_pos(position)
+
+
+def on_click(x, y, button, pressed):
+    if pressed:
+        print(f"Clicked {button} at screen position ({x}, {y})")
 
 
 def print_pos(position):
@@ -44,7 +42,7 @@ def print_pos(position):
     print(f"X: {position[0]}, Y: {position[1]}")
 
 def main():
-    print("Use the arrow keys to move. Click to show the image; press Escape to quit.")
+    print("Use the arrow keys to move. Click to see click coordinates; press Escape to quit.")
     print_pos(position)
 
     keyboard_listener = keyboard.Listener(on_press=on_press)
