@@ -93,7 +93,8 @@ INITIAL_DOT_COUNT = sum(cell in ".o" for row in LEVEL for cell in row)
 
 current_level = 0
 level_dot_count = INITIAL_DOT_COUNT
-maze = [list(row) for row in LEVELS[current_level]]
+level_mazes = [[list(row) for row in level] for level in LEVELS]
+maze = level_mazes[current_level]
 
 # Positions are stored as [column, row] so they can index the maze directly.
 player = [10, 16]
@@ -109,6 +110,7 @@ GHOST_AREA = {(9, 10), (10, 10), (11, 10), (10, 9)}
 GHOST_DOOR = (10, 9)
 
 ghosts = [pos.copy() for pos in ghost_starts]
+ghost_levels = [0 for _ in ghosts]
 ghost_facing = [(0, -1) for _ in ghosts]
 
 direction = (0, 0)
@@ -116,7 +118,7 @@ next_direction = (0, 0)
 ghost_direction = (0, 0)
 
 score = 0
-lives = 5
+lives = 10
 power_until = 0
 last_player_move = 0
 last_ghost_moves = [0 for _ in ghosts]
@@ -126,6 +128,8 @@ won = False
 pacman_won = False
 ghosts_won = False
 game_mode = None
+menu_screen = "main"
+single_player_mode = "classic"
 controlled_ghost = 0
 bonus_round = False
 bonus_until = 0
@@ -163,13 +167,101 @@ def move_character(pos, dx, dy, allow_ghost_area=False):
 
     return False
 
+def move_player(dx, dy):
+    global current_level, level_dot_count, maze
+
+    if single_player_mode == "upside_down" and dy == 0:
+        if player[0] == 0 and dx < 0:
+            target_x = len(maze[0]) - 1
+        elif player[0] == len(maze[0]) - 1 and dx > 0:
+            target_x = 0
+        else:
+            target_x = None
+
+        if target_x is not None:
+            target_level = (current_level + 1) % len(LEVELS)
+            target_maze = level_mazes[target_level]
+            target_y = player[1]
+            if target_maze[target_y][target_x] == "#":
+                return False
+            current_level = target_level
+            maze = target_maze
+            player[:] = [target_x, target_y]
+            level_dot_count = sum(
+                cell in ".o" for row in LEVELS[target_level] for cell in row
+            )
+            return True
+
+    return move_character(player, dx, dy)
+
+def player_can_move(dx, dy):
+    nx = (player[0] + dx) % len(maze[0])
+    ny = (player[1] + dy) % len(maze)
+    if (
+        single_player_mode == "upside_down"
+        and dy == 0
+        and ((player[0] == 0 and dx < 0)
+             or (player[0] == len(maze[0]) - 1 and dx > 0))
+    ):
+        target_level = (current_level + 1) % len(LEVELS)
+        target_maze = level_mazes[target_level]
+        return (
+            target_maze[ny][nx] != "#"
+            and (nx, ny) not in GHOST_AREA
+        )
+    return can_move(nx, ny)
+
+def move_ghost(ghost_index, dx, dy):
+    global maze
+
+    ghost = ghosts[ghost_index]
+    original_maze = maze
+    ghost_level = ghost_levels[ghost_index]
+    maze = level_mazes[ghost_level]
+
+    if single_player_mode == "upside_down" and dy == 0:
+        if ghost[0] == 0 and dx < 0:
+            target_x = len(maze[0]) - 1
+        elif ghost[0] == len(maze[0]) - 1 and dx > 0:
+            target_x = 0
+        else:
+            target_x = None
+
+        if target_x is not None:
+            target_level = (ghost_level + 1) % len(LEVELS)
+            target_maze = level_mazes[target_level]
+            target_y = ghost[1]
+            if target_maze[target_y][target_x] == "#":
+                maze = original_maze
+                return False
+            ghost_levels[ghost_index] = target_level
+            ghost[:] = [target_x, target_y]
+            maze = original_maze
+            return True
+
+    moved = move_character(ghost, dx, dy, allow_ghost_area=True)
+    maze = original_maze
+    return moved
+
+def remaining_dots():
+    if single_player_mode == "upside_down":
+        return sum(
+            cell in ".o"
+            for level_maze in level_mazes
+            for row in level_maze
+            for cell in row
+        )
+    return sum(cell in ".o" for row in maze for cell in row)
+
 def move_pacman_toward_dot():
     global direction
 
     powered_up = bonus_round or pygame.time.get_ticks() < power_until
     distance_from_ghosts = {}
     queue = deque()
-    for ghost in ghosts:
+    for ghost_index, ghost in enumerate(ghosts):
+        if ghost_levels[ghost_index] != current_level or eaten_ghosts[ghost_index]:
+            continue
         position = tuple(ghost)
         if position not in distance_from_ghosts:
             distance_from_ghosts[position] = 0
@@ -227,6 +319,7 @@ def move_pacman_toward_dot():
             (route_costs[tuple(ghost)], tuple(ghost))
             for ghost_index, ghost in enumerate(ghosts)
             if not eaten_ghosts[ghost_index]
+            and ghost_levels[ghost_index] == current_level
             and tuple(ghost) in route_costs
             and first_steps[tuple(ghost)] is not None
         ]
@@ -263,12 +356,14 @@ def move_pacman_toward_dot():
     return moved
 
 def reset_positions():
-    global direction, next_direction, ghost_direction
+    global direction, next_direction, ghost_direction, ghost_levels
 
     # Restore the player and ghosts after Pac-Man loses a life.
     player[:] = start
     for ghost, original in zip(ghosts, ghost_starts):
         ghost[:] = original
+    spawn_level = 0 if single_player_mode == "upside_down" else current_level
+    ghost_levels = [spawn_level for _ in ghosts]
     ghost_facing[:] = [(0, -1) for _ in ghosts]
 
     direction = (0, 0)
@@ -276,17 +371,22 @@ def reset_positions():
     ghost_direction = (0, 0)
 
 def restart_game():
-    global maze, score, lives, power_until, current_level, level_dot_count
+    global maze, level_mazes, ghost_levels
+    global score, lives, power_until, current_level, level_dot_count
     global last_player_move, last_ghost_moves, last_controlled_ghost_move
     global game_over, won, pacman_won, ghosts_won
     global controlled_ghost
     global bonus_round, bonus_until, eaten_ghosts
 
     current_level = 0
-    maze = [list(row) for row in LEVELS[current_level]]
+    level_mazes = [[list(row) for row in level] for level in LEVELS]
+    for level_maze in level_mazes:
+        level_maze[start[1]][start[0]] = " "
+    maze = level_mazes[current_level]
     level_dot_count = sum(cell in ".o" for row in maze for cell in row)
     maze[start[1]][start[0]] = " "
     reset_positions()
+    ghost_levels = [current_level for _ in ghosts]
     controlled_ghost = 0
 
     score = 0
@@ -304,25 +404,70 @@ def restart_game():
     eaten_ghosts = [False for _ in ghosts]
 
 def advance_level():
-    global current_level, level_dot_count, maze, power_until
+    global current_level, level_dot_count, level_mazes, maze, power_until
     global last_player_move, last_ghost_moves, last_controlled_ghost_move
     global controlled_ghost, bonus_round, bonus_until, eaten_ghosts
     global won, pacman_won, ghosts_won
+    global ghost_levels
 
-    if current_level + 1 >= len(LEVELS):
+    if single_player_mode == "upside_down":
         won = True
         return
 
-    current_level += 1
-    maze = [list(row) for row in LEVELS[current_level]]
+    if current_level + 1 >= len(LEVELS):
+        if single_player_mode == "infinite":
+            current_level = 0
+        else:
+            won = True
+            return
+    else:
+        current_level += 1
+
+    level_mazes[current_level] = [list(row) for row in LEVELS[current_level]]
+    maze = level_mazes[current_level]
     level_dot_count = sum(cell in ".o" for row in maze for cell in row)
     maze[start[1]][start[0]] = " "
     reset_positions()
+    ghost_levels = [current_level for _ in ghosts]
     controlled_ghost = 0
     power_until = 0
     bonus_round = False
     bonus_until = 0
     eaten_ghosts = [False for _ in ghosts]
+    pacman_won = False
+    ghosts_won = False
+
+    last_player_move = pygame.time.get_ticks()
+    last_ghost_moves = [last_player_move for _ in ghosts]
+    last_controlled_ghost_move = last_player_move
+
+def switch_map():
+    global current_level, level_dot_count, level_mazes, maze, power_until
+    global last_player_move, last_ghost_moves, last_controlled_ghost_move
+    global controlled_ghost, bonus_round, bonus_until, eaten_ghosts
+    global game_over, won, pacman_won, ghosts_won
+    global ghost_levels
+
+    if single_player_mode == "upside_down":
+        return
+
+    current_level = (current_level + 1) % len(LEVELS)
+    level_mazes[current_level] = [list(row) for row in LEVELS[current_level]]
+    level_mazes[current_level][start[1]][start[0]] = " "
+    maze = level_mazes[current_level]
+    level_dot_count = sum(
+        cell in ".o" for row in LEVELS[current_level] for cell in row
+    )
+    maze[start[1]][start[0]] = " "
+    reset_positions()
+    ghost_levels = [current_level for _ in ghosts]
+    controlled_ghost = 0
+    power_until = 0
+    bonus_round = False
+    bonus_until = 0
+    eaten_ghosts = [False for _ in ghosts]
+    game_over = False
+    won = False
     pacman_won = False
     ghosts_won = False
 
@@ -336,7 +481,7 @@ def check_collision():
     for ghost_index, (ghost, original) in enumerate(zip(ghosts, ghost_starts)):
         if eaten_ghosts[ghost_index]:
             continue
-        if player == ghost:
+        if ghost_levels[ghost_index] == current_level and player == ghost:
             if bonus_round or pygame.time.get_ticks() < power_until:
                 # Powered-up Pac-Man sends the ghost back to its starting tile.
                 score += int(200 * GHOST_SCORE_MULTIPLIERS[ghost_index])
@@ -346,6 +491,8 @@ def check_collision():
                         advance_level()
                 else:
                     ghost[:] = original.copy()
+                    if single_player_mode == "upside_down":
+                        ghost_levels[ghost_index] = 0
             elif game_mode == "ghost":
                 won = True
             else:
@@ -360,6 +507,27 @@ def check_collision():
 def ghost_target(ghost_index, distances):
     player_x, player_y = player
     direction_x, direction_y = direction
+
+    if (
+        single_player_mode == "upside_down"
+        and ghost_levels[ghost_index] != current_level
+    ):
+        portals = [(0, 10), (len(maze[0]) - 1, 10)]
+        width = len(maze[0])
+
+        def distance_to_player_after_crossing(portal):
+            entry_x = width - 1 if portal[0] == 0 else 0
+            dx = abs(player_x - entry_x)
+            dy = abs(player_y - portal[1])
+            return min(dx, width - dx) + min(dy, len(maze) - dy)
+
+        return min(
+            portals,
+            key=lambda position: (
+                distances.get(position, float("inf"))
+                + distance_to_player_after_crossing(position)
+            )
+        )
 
     if ghost_index == 0:
         return player_x, player_y
@@ -385,6 +553,18 @@ def ghost_target(ghost_index, distances):
     return player_x, player_y
 
 def ghost_move(ghost, ghost_index):
+    if (
+        single_player_mode == "upside_down"
+        and ghost_levels[ghost_index] != current_level
+        and ghost[1] == 10
+    ):
+        if ghost[0] == 0:
+            move_ghost(ghost_index, -1, 0)
+            return
+        if ghost[0] == len(maze[0]) - 1:
+            move_ghost(ghost_index, 1, 0)
+            return
+
     start_position = tuple(ghost)
     distances = {start_position: 0}
     first_steps = {start_position: None}
@@ -423,7 +603,7 @@ def ghost_move(ghost, ghost_index):
             distances[position]
         )
     )
-    move_character(ghost, *first_steps[target], allow_ghost_area=True)
+    move_ghost(ghost_index, *first_steps[target])
 
 def pacman_mouth_points(px, py, radius, facing):
     dx, dy = facing
@@ -492,7 +672,7 @@ def draw_game():
 
     # Draw each ghost, changing its color while the power pellet is active.
     for i, ghost in enumerate(ghosts):
-        if eaten_ghosts[i]:
+        if eaten_ghosts[i] or ghost_levels[i] != current_level:
             continue
         gx = ghost[0]*TILE + TILE//2
         gy = ghost[1]*TILE + TILE//2
@@ -557,7 +737,8 @@ def draw_game():
             ghosts_left = len(ghosts) - sum(eaten_ghosts)
             bonus_status = f"    Ghosts: {ghosts_left}    Time: {seconds_left}s"
         info = font.render(
-            f"Score: {score}    Lives: {lives}    Map: {current_level + 1}/{len(LEVELS)}{bonus_status}",
+            f"Score: {score}    Lives: {lives}    Map: {current_level + 1}/{len(LEVELS)}"
+            f"    Mode: {single_player_mode.replace('_', ' ').title()}{bonus_status}",
             True, WHITE
         )
         screen.blit(info, (10, HEIGHT-40))
@@ -601,13 +782,23 @@ def draw_menu():
     title = title_font.render("PAC-MAN", True, YELLOW)
     screen.blit(title, title.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100)))
 
-    instructions = [
-        "Choose a game mode",
-        "P: Single player as Pac-Man (arrow keys)",
-        "G: Single player as a ghost (WASD; E switches ghosts)",
-        "T: Two players (P1 arrows; P2 ghost uses WASD)",
-        "In Ghost mode, catch Pac-Man before all dots are eaten."
-    ]
+    if menu_screen == "single_player":
+        instructions = [
+            "Choose a single-player mode",
+            "1: Classic - clear both maps and defeat all ghosts",
+            "2: Infinite - maps repeat until you lose all lives",
+            "3: Upside-down - use side tunnels to travel between maps",
+            "The 60-second ghost hunt starts after all dots are cleared.",
+            "Backspace: return to the main menu"
+        ]
+    else:
+        instructions = [
+            "Choose a game mode",
+            "P: Single-player mode menu",
+            "G: Single player as a ghost (WASD; E switches ghosts)",
+            "T: Two players (P1 arrows; P2 ghost uses WASD)",
+            "In Ghost mode, catch Pac-Man before all dots are eaten."
+        ]
     for index, line in enumerate(instructions):
         text = status_font.render(line, True, WHITE)
         screen.blit(
@@ -627,6 +818,7 @@ def main():
     global ghosts_won
     global game_mode, controlled_ghost
     global bonus_round, bonus_until
+    global menu_screen, single_player_mode
 
     running = True
 
@@ -640,15 +832,37 @@ def main():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if game_mode is None and menu_screen == "single_player":
+                        menu_screen = "main"
+                    else:
+                        running = False
                 elif game_mode is None:
-                    if event.key in (pygame.K_p, pygame.K_1):
+                    if menu_screen == "main" and event.key in (pygame.K_p, pygame.K_1):
+                        menu_screen = "single_player"
+                    elif menu_screen == "single_player" and event.key in (
+                        pygame.K_BACKSPACE, pygame.K_ESCAPE
+                    ):
+                        menu_screen = "main"
+                    elif menu_screen == "single_player" and event.key in (
+                        pygame.K_1, pygame.K_2, pygame.K_3
+                    ):
+                        single_player_mode = {
+                            pygame.K_1: "classic",
+                            pygame.K_2: "infinite",
+                            pygame.K_3: "upside_down"
+                        }[event.key]
                         game_mode = "pacman"
                         restart_game()
-                    elif event.key in (pygame.K_g, pygame.K_2):
+                    elif menu_screen == "main" and event.key in (
+                        pygame.K_g, pygame.K_2
+                    ):
+                        single_player_mode = "classic"
                         game_mode = "ghost"
                         restart_game()
-                    elif event.key in (pygame.K_t, pygame.K_3):
+                    elif menu_screen == "main" and event.key in (
+                        pygame.K_t, pygame.K_3
+                    ):
+                        single_player_mode = "classic"
                         game_mode = "two_player"
                         restart_game()
                 elif event.key == pygame.K_r:
@@ -660,6 +874,8 @@ def main():
                         last_controlled_ghost_move = now
                         if lives <= 0:
                             game_over = True
+                elif event.key == pygame.K_l:
+                    switch_map()
                 elif event.key == pygame.K_UP:
                     next_direction = (0, -1)
                 elif event.key == pygame.K_DOWN:
@@ -709,14 +925,11 @@ def main():
                     move_pacman_toward_dot()
                 else:
                     dx, dy = next_direction
-                    nx = (player[0] + dx) % len(maze[0])
-                    ny = player[1] + dy
-
-                    if can_move(nx, ny):
+                    if player_can_move(dx, dy):
                         direction = next_direction
 
                     # Continue in the last valid direction when a turn is blocked.
-                    move_character(player, *direction)
+                    move_player(*direction)
 
                 cell = maze[player[1]][player[0]]
 
@@ -733,8 +946,17 @@ def main():
 
             # Move each ghost on its own timer; Blinky speeds up as dots are eaten.
             if not game_over and not won:
-                dots_left = sum(cell in ".o" for row in maze for cell in row)
-                dots_eaten = level_dot_count - dots_left
+                dots_left = remaining_dots()
+                if single_player_mode == "upside_down":
+                    total_dots = sum(
+                        cell in ".o"
+                        for level in LEVELS
+                        for row in level
+                        for cell in row
+                    )
+                    dots_eaten = total_dots - dots_left
+                else:
+                    dots_eaten = level_dot_count - dots_left
                 for ghost_index, ghost in enumerate(ghosts):
                     if eaten_ghosts[ghost_index]:
                         continue
@@ -747,14 +969,14 @@ def main():
                         continue
                     last_ghost_moves[ghost_index] = now
 
+                    player_maze = maze
+                    maze = level_mazes[ghost_levels[ghost_index]]
                     previous_position = ghost.copy()
                     if (
                         game_mode in ("ghost", "two_player")
                         and ghost_index == controlled_ghost
                     ):
-                        move_character(
-                            ghost, *ghost_direction, allow_ghost_area=True
-                        )
+                        move_ghost(ghost_index, *ghost_direction)
                         if ghost != previous_position:
                             last_controlled_ghost_move = now
                     elif bonus_round or now < power_until:
@@ -765,12 +987,11 @@ def main():
                         random.shuffle(options)
 
                         for dx, dy in options:
-                            if move_character(
-                                ghost, dx, dy, allow_ghost_area=True
-                            ):
+                            if move_ghost(ghost_index, dx, dy):
                                 break
                     else:
                         ghost_move(ghost, ghost_index)
+                    maze = player_maze
 
                     if ghost != previous_position:
                         ghost_facing[ghost_index] = (
@@ -789,11 +1010,7 @@ def main():
                     check_collision()
 
             # Clearing the maze starts a timed round to eat every ghost.
-            if not any(
-                cell in (".", "o")
-                for row in maze
-                for cell in row
-            ):
+            if remaining_dots() == 0:
                 if not bonus_round:
                     bonus_round = True
                     bonus_until = now + BONUS_ROUND_DURATION
